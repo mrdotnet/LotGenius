@@ -1,5 +1,10 @@
 .DS_Store
 
+# Local agentic-RAG testbed — Kadima Background IP runtime + dummy data.
+# NOT a Deliverable (PRD §9): the runtime implementation must never ship as source
+# in this repo. Lives here only for local build/test while access is pending.
+local-dev/
+
 # Claude Code local / runtime (per-user, provisioned not committed)
 # `.claude/helpers/` is re-installed per clone via the provision-repo-claude skill.
 # Tracked: .claude/settings.json, .claude/hooks/. Ignored: the rest below.
@@ -9,3 +14,19 @@
 .claude/helpers/
 .claude/scheduled_tasks.lock
 .claude/worktrees/
+
+# Rust build output (MCP seam crate)
+src/mcp-server/target/
+
+# Terraform (infra/) — caches, state, and filled-in vars are local/secret.
+# Tracked by design: *.tf, terraform.tfvars.example, and .terraform.lock.hcl (version pins).
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+crash.*.log
+
+# Local swarm / sptflo runtime state (machine-local, not a deliverable)
+.spt/
+.sptflo/

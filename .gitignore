@@ -1,1 +1,11 @@
 .DS_Store
+
+# Claude Code local / runtime (per-user, provisioned not committed)
+# `.claude/helpers/` is re-installed per clone via the provision-repo-claude skill.
+# Tracked: .claude/settings.json, .claude/hooks/. Ignored: the rest below.
+.claude/settings.local.json
+.claude/config/
+.claude/tts-*.txt
+.claude/helpers/
+.claude/scheduled_tasks.lock
+.claude/worktrees/

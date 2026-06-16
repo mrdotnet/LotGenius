@@ -1,0 +1,38 @@
+{
+  "name": "analyze",
+  "title": "Reasoning, classification & valuation analysis",
+  "description": "Classify a query into the category lattice / make-model normalization (constraint-propagation gate: alias/override hard constraints first, pgvector proximity second), reason over the fused comps + authoritative numbers, and emit a human-readable answer with an inspectable classification receipt. Backed by the reasoning model (MAI-Thinking-1) and the ReasoningBank (inference-time memory). Refuses to act below the confidence floor (escalates to a human instead of guessing). Anti-fabrication: every number must cite a Lot ID.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "query": { "type": "string" },
+      "comps": { "type": "array", "items": { "type": "object" }, "description": "Output of comps_search." },
+      "facts": { "type": "array", "items": { "type": "object" }, "description": "Authoritative rows from structured_query." },
+      "user_claim": { "type": "object" },
+      "mode": { "type": "string", "enum": ["answer", "classify_only"], "default": "answer" }
+    },
+    "required": ["query"],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "answer": { "type": "string", "description": "Conversational answer; null when escalating." },
+      "classification_receipt": {
+        "type": "object",
+        "description": "Surfaced + editable. The legible reasoning the admin can correct.",
+        "properties": {
+          "category_path": { "type": "string" },
+          "make_model_normalization": { "type": "string" },
+          "included": { "type": "array", "items": { "type": "object", "properties": { "value": {"type":"string"}, "reason": {"type":"string"} } } },
+          "excluded": { "type": "array", "items": { "type": "object", "properties": { "value": {"type":"string"}, "reason": {"type":"string"} } } },
+          "confidence": { "type": "number" },
+          "reasoningbank_hit": { "type": "boolean", "description": "True when a prior episode's mapping was reused ('I've seen this before')." }
+        }
+      },
+      "citations": { "type": "array", "items": { "type": "integer" }, "description": "Lot IDs backing every number stated." },
+      "escalate": { "type": "boolean", "description": "True when below the confidence floor — caller must defer to a human, not fabricate." }
+    },
+    "required": ["classification_receipt", "escalate"]
+  }
+}

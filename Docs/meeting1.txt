@@ -1,0 +1,281 @@
+
+Transcript. Use arrow keys to navigate between transcript entries. Select an entry to navigate the media to the time of the entry.
+
+
+Search
+
+AI-generated content may be incorrect
+
+John Mendes started transcription
+
+Philippe Richard
+0 minutes 3 seconds0:03
+Philippe Richard 0 minutes 3 seconds
+To it, or how you came to choose Synapse, and there's a very specific reason I'm asking, but I'd like to hear your thought first.
+ST
+
+Sean Todd
+0 minutes 6 seconds0:06
+Sean Todd 0 minutes 6 seconds
+Sit.
+
+John Mendes
+0 minutes 9 seconds0:09
+John Mendes 0 minutes 9 seconds
+Okay.
+ST
+
+Sean Todd
+0 minutes 10 seconds0:10
+Sean Todd 0 minutes 10 seconds
+Yeah, so we've actually been leveraging Synapse for three years now before Fabric became a thing. So it's our, called our data warehouse, our data, you know, like at the end of the day, it's everything's aggregated there.
+
+Philippe Richard
+0 minutes 14 seconds0:14
+Philippe Richard 0 minutes 14 seconds
+Okay.
+Philippe Richard 0 minutes 21 seconds
+I figured, okay, so...
+Philippe Richard 0 minutes 24 seconds
+Okay, so just to make two comments, and I mean, obviously, it's out of scope for this particular question right now, but one, Microsoft is no longer supporting Synapse Long Haul, and they are actually paying customers to move. And the reason I say that is because the kind of work you're doing is essentially A deterministic.
+Philippe Richard 0 minutes 47 seconds
+kind of agent and that is native in fabric.
+Philippe Richard 0 minutes 52 seconds
+So a lot of what you're trying to do from a point of view of getting precise, deterministic answers is actually supported natively by agents that are hosted in Fabric. And so that's worth thinking about, you know, long term. So.
+ST
+
+Sean Todd
+1 minute 6 seconds1:06
+Sean Todd 1 minute 6 seconds
+Yeah, for sure. Yeah, and we, so we know we've been in this little bit of a transition phase knowing that we're going to have to go to Fabric at some point. And then we're also skirting on the edge of having to pay full-blown Fabric licensing as opposed to not using Fabric but leveraging Power BI.
+Sean Todd 1 minute 26 seconds
+licensing and stuff like that. So we're right on the edge of that. And that's, this is all, these are projects that have been, you know, out there for a couple of years that we've been working with. And so we've got dashboards and Power BI, stuff like that. It was always meant to be sort of a, hey, let's get started. Let's get it here. And so we've got information in one spot. We've got the data. We know Power BI is probably not going to be our long-term solution. We're going to have to do something.
+
+Philippe Richard
+1 minute 26 seconds1:26
+Philippe Richard 1 minute 26 seconds
+Yeah.
+ST
+
+Sean Todd
+1 minute 50 seconds1:50
+Sean Todd 1 minute 50 seconds
+different. And we will have to move up in the fabric side of things. We know that. And we're definitely want to think about that as one of our projects.
+
+Philippe Richard
+1 minute 57 seconds1:57
+Philippe Richard 1 minute 57 seconds
+Okay.
+Philippe Richard 2 minutes 3 seconds
+Okay, no, I was just curious, because that's one of the things that, you know, I'm seeing customers realizing, and Synapse, unfortunately, as nice as it is in many regards, has no future in Agent **** AI as far as Microsoft is concerned. So, you know, that's worth realizing, especially for the kind of agents that you're actually, you know,
+ST
+
+Sean Todd
+2 minutes 16 seconds2:16
+Sean Todd 2 minutes 16 seconds
+Yep.
+Sean Todd 2 minutes 19 seconds
+Yeah.
+
+Philippe Richard
+2 minutes 25 seconds2:25
+Philippe Richard 2 minutes 25 seconds
+focused on because that's the other part of it. I guess that, I mean, cleared that up. I mean, what I see in your design is, first of all, it was funny when you talk about Claude. We should have your Claude talk to my Claude. He could teach him a few things, but you know, where they might have a field day just...
+Philippe Richard 2 minutes 45 seconds
+you know, playing together or something. The mic lot is actually a custom framework made up of about 40 semi-autonomous agents that have proven pretty amazing. But that's, you know, so I kinda, I'm looking at the way you're approaching it, and I would approach it.
+ST
+
+Sean Todd
+2 minutes 58 seconds2:58
+Sean Todd 2 minutes 58 seconds
+Ohh.
+
+Philippe Richard
+3 minutes 5 seconds3:05
+Philippe Richard 3 minutes 5 seconds
+sensibly the same way, but I think the reason you're running into trouble is because you're trying to do too much with queries instead of leveraging A vertex database, right? That's the heart of this, and there's actually some pretty inexpensive ways to fix that, which would pretty much solve your entire chat, like make an MCP server with essentially a...
+ST
+
+Sean Todd
+3 minutes 16 seconds3:16
+Sean Todd 3 minutes 16 seconds
+Yes, yes.
+
+Philippe Richard
+3 minutes 29 seconds3:29
+Philippe Richard 3 minutes 29 seconds
+data stack that's a like a vertex database you get a proximity search in multi-dimensions and then proper classification that solve your problem right there.
+Philippe Richard 3 minutes 40 seconds
+So that's the crux of my thinking when I look at this, because that's how I would approach it, and I've done a lot of them. So I can vouch for the fact that it works really well as a solution.
+ST
+
+Sean Todd
+3 minutes 47 seconds3:47
+Sean Todd 3 minutes 47 seconds
+Yeah.
+Sean Todd 3 minutes 54 seconds
+So would you maybe be able to, here, let me step back. So there's a couple of different ways we're looking at this, data governance being one of them, or not surfacing information for certain people and certain agents. And that's why we are being able to be selective with, you know, the tables that we're pulling in essentially.
+
+Marc Farron
+4 minutes 12 seconds4:12
+Marc Farron 4 minutes 12 seconds
+The.
+
+Philippe Richard
+4 minutes 16 seconds4:16
+Philippe Richard 4 minutes 16 seconds
+Yeah.
+ST
+
+Sean Todd
+4 minutes 17 seconds4:17
+Sean Todd 4 minutes 17 seconds
+Because that by its very nature pulls it out. Now, having said that, the interesting thing is, I'm not sure some of the information I'm asking it, even with what's there, I want everybody to see like trending and stuff like that. And this is the tricky part for me. It's like, well, at some point, you're going to have to give them some of that because it's there. Unless you flat out tell it in its instructions, just never, ever, ever.
+
+Marc Farron
+4 minutes 17 seconds4:17
+Marc Farron 4 minutes 17 seconds
+Uh-huh.
+
+Philippe Richard
+4 minutes 27 seconds4:27
+Philippe Richard 4 minutes 27 seconds
+It's right.
+ST
+
+Sean Todd
+4 minutes 40 seconds4:40
+Sean Todd 4 minutes 40 seconds
+Never, whatever, but.
+
+Philippe Richard
+4 minutes 43 seconds4:43
+Philippe Richard 4 minutes 43 seconds
+That's where Agent Tic can come into play in a really big way. I don't know how much Mark told you, but you know, after 9-11, I became, I was brought in basically to solve a security problem that crept up across organizations and governments.
+ST
+Sean Todd
+4 minutes 46 seconds4:46
+Sean Todd 4 minutes 46 seconds
+Yeah.
+
+Philippe Richard
+5 minutes5:00
+Philippe Richard 5 minutes
+Before then, I had no idea what that was. I knew security, but I didn't know that kind of scope of, you know, personally identifiable information and that sort of thing. But, you know, when the government comes two days after 9-11 and says, hey, Mr. Richard, we'd like to talk to you about what you're doing. Yeah, you listen. So ended up doing a bunch of work in Los Alamos and I left
+ST
+Sean Todd
+5 minutes 10 seconds5:10
+Sean Todd 5 minutes 10 seconds
+Mhm.
+Sean Todd 5 minutes 19 seconds
+Yeah.
+
+Philippe Richard
+5 minutes 24 seconds5:24
+Philippe Richard 5 minutes 24 seconds
+that whole thing is I didn't want a security clearance. I wanted to be able to actually apply what I do for real world applications where security matters for real things. You know, I mean, leave it to other people to worry about the classified stuff. I don't want to have to declare every time I go in a plane to, you know, somebody who I'm going to be on the plane with. Like that's just.
+ST
+Sean Todd
+5 minutes 34 seconds5:34
+Sean Todd 5 minutes 34 seconds
+Right.
+
+Philippe Richard
+5 minutes 44 seconds5:44
+Philippe Richard 5 minutes 44 seconds
+doesn't, you know, have any appeal. But the reason I mentioned that's because in Agent Tech AI, we can actually create, you know, agents for personally identifiable information to make sure that things you've defined, not just a specific, you know, role or cell, but really anything that contains information that matches.
+ST
+Sean Todd
+5 minutes 46 seconds5:46
+Sean Todd 5 minutes 46 seconds
+Right.
+
+Philippe Richard
+6 minutes 6 seconds6:06
+Philippe Richard 6 minutes 6 seconds
+an intent or a pattern or an origin can be immediately prevented from being shown, right? And so instead of having kind of the, I'm trying to catch all the patterns and identify everything, but in the process, my searches now become kind of crippled in many ways because they lose access to some dimensions of the data.
+Philippe Richard 6 minutes 27 seconds
+you have the agent is able to do the search and then looking at the results, the other agents, usually I prefer to divide these things because an agent that's really good at personally identifiable information is not necessarily that great at doing other parts and sometimes there are filters like you already have that should be.
+Philippe Richard 6 minutes 46 seconds
+applied as well. It's a combination most of the time. But the end result is you can get a very robust, very reliable ability to query that is going to be able to search across most everything, but only return the information that it's allowed to show, right? Which I think if I'm following your video and I was looking at this, my dad was an industrial distributor in Canada for
+ST
+Sean Todd
+7 minutes 3 seconds7:03
+Sean Todd 7 minutes 3 seconds
+Yep.
+
+Philippe Richard
+7 minutes 9 seconds7:09
+Philippe Richard 7 minutes 9 seconds
+years and years and years. So I understand pretty well some of the patterns, you know, involved. They've been, my family has been in industrial distribution and, you know, that kind of world for a long time, especially heavy equipment and that kind of thing. So, you know, I'm the black sheep. I went to the technology side of things. But
+ST
+Sean Todd
+7 minutes 26 seconds7:26
+Sean Todd 7 minutes 26 seconds
+We all, we all have to be that at some point, right?
+
+Marc Farron
+7 minutes 29 seconds7:29
+Marc Farron 7 minutes 29 seconds
+Yes.
+
+Philippe Richard
+7 minutes 29 seconds7:29
+Philippe Richard 7 minutes 29 seconds
+Exactly, but you know I love, I love this kind of, so I get I get an idea of what you know you're dealing with, and I think we could easily set you up with like a good vertex, you know, store potentially, depending on the exact size you have, you could use, you know, something hosted in Azure instead of...
+Philippe Richard 7 minutes 49 seconds
+Paying Microsoft, like, for example, if you talk to Microsoft, they'll say, "Hey, do that in Cosmos DB," and I'll be the first guy to tell you, "Please don't," you know, not if you like your wallet, you know, their pricing on that is just flat out wrong. Sorry, Mark, I know you'd make probably something on that, but...
+ST
+Sean Todd
+7 minutes 57 seconds7:57
+Sean Todd 7 minutes 57 seconds
+Yeah.
+Sean Todd 8 minutes
+Yeah.
+
+Philippe Richard
+8 minutes 8 seconds8:08
+Philippe Richard 8 minutes 8 seconds
+This is one of those that unless you have very specific requirements, it's outsized and over expensive for a lot of people. On the other hand, they have like managed Postgres, which for a Vertex store is incredibly powerful, super cheap, you know, to run at and very, very effective for that kind of thing.
+Philippe Richard 8 minutes 29 seconds
+You also have SQL 2025 hosted that can actually host agents inside the database, which is another thing if when you're thinking about what happens post synapse, you know, that's actually an interesting way to do things, you know, is instead of going say like full on fabric, go, you know, the new version of SQL Server, which is very.
+Philippe Richard 8 minutes 49 seconds
+different than the past and embed agents in there. The idea is that an agent that's inside the data, right, is able to work massively faster. And if you combine it with some deterministic, you know, I've used in the past various mechanisms, like say, temporal neural solvers or implementing other things that can do real time.
+Philippe Richard 9 minutes 10 seconds
+responses and follow patterns on things, you can actually create the equivalent of a highly deterministic type of result without having to rely on a bunch of queries. Because basically, you have data agents that work at the data level. They have, you know, they don't have the kind of latency and have the
+Philippe Richard 9 minutes 30 seconds
+you know, they can almost anticipate your query. And which takes me to the other thing I would suggest to you. I've done a lot of work around creating what amounts to memory and reasoning banks. You talk about your context, right? I got a few tricks up my sleeve to take care of the context problem once and for all.
+ST
+Sean Todd
+9 minutes 33 seconds9:33
+Sean Todd 9 minutes 33 seconds
+Yeah.
+
+Philippe Richard
+9 minutes 49 seconds9:49
+Philippe Richard 9 minutes 49 seconds
+and giving your agents essentially a reasoning bank, the ability to get better over time and be able to have to better anticipate what will be asked. And that can even be done right down to a user level because it can run in a browser.
+ST
+Sean Todd
+10 minutes 4 seconds10:04
+Sean Todd 10 minutes 4 seconds
+So when we're talking, you know, that type of scenario, are we talking moving out of the Microsoft Copilot framework into sort of standalone stuff?
+
+Philippe Richard
+10 minutes 11 seconds10:11
+Philippe Richard 10 minutes 11 seconds
+No.
+Philippe Richard 10 minutes 13 seconds
+No, no, you combine. Yeah.
+ST
+Sean Todd
+10 minutes 14 seconds10:14
+Sean Todd 10 minutes 14 seconds
+Could we?
+Sean Todd 10 minutes 17 seconds
+But without, because here's my thing: I think the way Copilot is setting things up, in my, from my point of view, and seeing what Microsoft is doing with some of their other frameworks that they're rolling out, like the open source framework they've got, and then some of the stuff in, you know, Foundry.
+
+Philippe Richard
+10 minutes 31 seconds10:31
+Philippe Richard 10 minutes 31 seconds
+Yeah.

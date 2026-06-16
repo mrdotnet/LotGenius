@@ -1,0 +1,44 @@
+{
+  "name": "structured_query",
+  "title": "Structured aggregate query (parameterized)",
+  "description": "Run a PARAMETERIZED, allowlisted query template against Synapse Serverless for exact aggregates, trends, counts, and geography filters — or to fetch authoritative price/date/region for a set of lot_ids returned by comps_search. NEVER generates free-form SQL. Every number returned is authoritative and traceable to a Lot ID.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "template": {
+        "type": "string",
+        "description": "Allowlisted template name.",
+        "enum": [
+          "lots_by_ids",
+          "avg_price_by_category",
+          "price_trend_by_category",
+          "count_by_region",
+          "top_descriptions_by_performance"
+        ]
+      },
+      "params": {
+        "type": "object",
+        "description": "Template-specific parameters (validated server-side).",
+        "properties": {
+          "lot_ids": { "type": "array", "items": { "type": "integer" } },
+          "category": { "type": "string" },
+          "region": { "type": "string" },
+          "date_from": { "type": "string", "format": "date" },
+          "date_to": { "type": "string", "format": "date" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "required": ["template", "params"],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "rows": { "type": "array", "items": { "type": "object" } },
+      "row_count": { "type": "integer" },
+      "filter_notes": { "type": "string", "description": "Human-readable description of the scope actually applied (for transparency)." }
+    },
+    "required": ["rows", "row_count"]
+  }
+}

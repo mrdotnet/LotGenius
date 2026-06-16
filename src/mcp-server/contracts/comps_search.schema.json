@@ -1,0 +1,52 @@
+{
+  "name": "comps_search",
+  "title": "Comparable-sales search",
+  "description": "Find genuinely comparable lots for a piece of equipment using semantic (pgvector) proximity over normalized make/model/spec/description embeddings, with metadata filters. Returns candidate lot_ids + similarity ONLY; authoritative numbers are supplied separately by structured_query (vector finds the lots, SQL supplies the trusted numbers).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "query": { "type": "string", "description": "Natural-language equipment description, e.g. '2023 John Deere X9 1100 combine'." },
+      "filters": {
+        "type": "object",
+        "properties": {
+          "category": { "type": "string" },
+          "make": { "type": "string" },
+          "model": { "type": "string" },
+          "year_min": { "type": "integer" },
+          "year_max": { "type": "integer" },
+          "region": { "type": "string" },
+          "sale_date_from": { "type": "string", "format": "date" },
+          "sale_date_to": { "type": "string", "format": "date" }
+        },
+        "additionalProperties": false
+      },
+      "top_k": { "type": "integer", "default": 5, "minimum": 1, "maximum": 50 },
+      "min_similarity": { "type": "number", "default": 0.0, "description": "Confidence floor; below this the tool returns no comps rather than weak matches." }
+    },
+    "required": ["query"],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "comps": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "lot_id": { "type": "integer" },
+            "similarity": { "type": "number" },
+            "category": { "type": "string" },
+            "make_norm": { "type": "string" },
+            "model_norm": { "type": "string" },
+            "year": { "type": "integer" }
+          },
+          "required": ["lot_id", "similarity"]
+        }
+      },
+      "classification_receipt": { "type": "object", "description": "How the query was classified (see analyze/classification receipt)." },
+      "low_confidence": { "type": "boolean", "description": "True when no comp cleared min_similarity — caller must say 'no good comps' rather than fabricate." }
+    },
+    "required": ["comps", "low_confidence"]
+  }
+}

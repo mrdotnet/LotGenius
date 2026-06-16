@@ -1,0 +1,44 @@
+{
+  "name": "pii_scrub",
+  "title": "PII / sensitive-data redaction",
+  "description": "Apply intent-, pattern-, and value-level redaction (beyond the column blocklist) to a result set before it leaves the tool boundary. Enforced server-side as a HARD validation-gate constraint — the orchestrator/LLM never sees unredacted sensitive data. Honors the existing sensitive-column blocklist plus the propagated Entra user claim for coarse allow/deny.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "rows": { "type": "array", "items": { "type": "object" }, "description": "Result rows to scrub." },
+      "user_claim": {
+        "type": "object",
+        "description": "Propagated Entra identity for coarse allow/deny (row-level ACLs are out of scope for the PoC).",
+        "properties": {
+          "oid": { "type": "string" },
+          "groups": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "policy": {
+        "type": "string",
+        "default": "default",
+        "description": "Named PII policy (blocklist + patterns) to apply."
+      }
+    },
+    "required": ["rows"],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "rows": { "type": "array", "items": { "type": "object" } },
+      "redactions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "field": { "type": "string" },
+            "reason": { "type": "string", "description": "blocklist | pattern | intent | access" }
+          }
+        },
+        "description": "Auditable record of what was redacted and why."
+      }
+    },
+    "required": ["rows", "redactions"]
+  }
+}

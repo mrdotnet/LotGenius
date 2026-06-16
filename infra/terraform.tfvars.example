@@ -1,0 +1,25 @@
+# Copy to terraform.tfvars and fill in. Do NOT commit real values.
+
+subscription_id = "e1c620c2-0000-0000-0000-000000000000" # Steffes PAYG subscription
+tenant_id       = "00000000-0000-0000-0000-000000000000" # Steffes tenant
+location        = "centralus"
+
+# Use a dedicated RG for clean teardown, or set to "rg-steffes-copilot" + create_resource_group=false
+resource_group_name   = "rg-steffes-lotgenius-poc"
+create_resource_group = true
+
+name_prefix = "lotgenius"
+
+# Lot Genius Admins Entra group — set as Postgres Entra admin.
+lot_genius_admins_group_object_id = "00000000-0000-0000-0000-000000000000"
+pg_admin_login                    = "Lot Genius Admins" # group display name (principal_type=Group)
+
+manage_app_regs = false # operator likely lacks Application Administrator
+
+# Operator public IP (/32) for Postgres firewall during the build.
+allowed_client_ip = "203.0.113.10"
+
+# Models (override if catalog names differ at build time)
+embedding_model = "text-embedding-3-large"
+intent_model    = "gpt-4o-mini"
+reasoning_model = "MAI-Thinking-1"

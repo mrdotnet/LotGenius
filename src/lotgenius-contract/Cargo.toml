@@ -1,0 +1,18 @@
+[package]
+name = "lotgenius-contract"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Lot Genius runtime INTERFACE — the `LotGeniusRuntime` trait + the boundary error message. This is the narrow, published interface across the IP boundary (PRD §9): the seam (lotgenius-mcp) and the Background-IP runtime both depend on it, but it contains NO tool logic and NO runtime. Part of the Deliverable seam."
+license = "LicenseRef-Proprietary"
+publish = false
+
+[lib]
+name = "lotgenius_contract"
+path = "src/lib.rs"
+
+[dependencies]
+# Interface-only: the trait passes JSON values across the boundary (the same JSON the
+# four contracts/*.schema.json describe), so nothing heavier than serde_json is needed.
+anyhow = "1"
+serde_json = "1"

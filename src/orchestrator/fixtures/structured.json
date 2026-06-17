@@ -1,0 +1,23 @@
+{
+  "_scenario": "Pure aggregate query: 'What is the average price of combines?'. Routes to structured_query (avg_price_by_category); analyze answers from the authoritative aggregate row, citing the underlying lots. No comps_search needed.",
+  "structured_query": {
+    "rows": [
+      { "category": "combine", "avg_price": 472500, "n": 38, "lot_ids": [4412, 4380, 4501, 4290, 4188, 3990, 3877] }
+    ],
+    "row_count": 1,
+    "filter_notes": "average hammer price across all combine lots in the dataset"
+  },
+  "analyze": {
+    "answer": "Across 38 combine lots, the average hammer price is $472,500.",
+    "classification_receipt": {
+      "category_path": "agriculture > harvesting > combine",
+      "make_model_normalization": "category-level aggregate (no single make/model)",
+      "included": [{ "value": "combine", "reason": "category aggregate requested" }],
+      "excluded": [],
+      "confidence": 0.96,
+      "reasoningbank_hit": false
+    },
+    "citations": [4412, 4380, 4501, 4290, 4188, 3990, 3877],
+    "escalate": false
+  }
+}

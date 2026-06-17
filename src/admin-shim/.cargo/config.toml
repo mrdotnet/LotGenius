@@ -1,0 +1,4 @@
+# Keep this standalone PoC crate's build artifacts local (./target), never in a parent/sibling
+# repo's target dir set by a higher-level ~/.cargo/config.toml. Mirrors src/mcp-server/.cargo.
+[build]
+target-dir = "target"

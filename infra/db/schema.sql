@@ -17,14 +17,16 @@ CREATE TABLE IF NOT EXISTS lot_vectors (
     sale_date       DATE,
     hammer_price    NUMERIC,        -- authoritative number lives in Synapse; mirrored here only for filtering
     text_blob       TEXT,           -- normalized make/model + title + description + key specs
-    embedding       vector(3072),   -- TODO: match dimension to chosen model/truncation
+    embedding       halfvec(3072),  -- text-embedding-3-large (3072d) as HALFVEC, not vector:
+                                    -- pgvector's HNSW caps `vector` at 2000 dims; halfvec supports
+                                    -- up to 4000 at full semantic fidelity (half the storage).
     source_table    TEXT,           -- 'curated-steffes' | 'curated-biggerpicture'
     updated_at      TIMESTAMPTZ DEFAULT now()
 );
 
 -- HNSW index for cosine proximity (comps_search). Tune m / ef_construction at workshop.
 CREATE INDEX IF NOT EXISTS lot_vectors_embedding_hnsw
-    ON lot_vectors USING hnsw (embedding vector_cosine_ops)
+    ON lot_vectors USING hnsw (embedding halfvec_cosine_ops)
     WITH (m = 16, ef_construction = 64);
 
 -- Metadata filter helpers.
@@ -36,7 +38,7 @@ CREATE INDEX IF NOT EXISTS lot_vectors_make_model_idx ON lot_vectors (make_norm,
 CREATE TABLE IF NOT EXISTS reasoning_bank (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     normalized_query    TEXT,
-    query_embedding     vector(3072),
+    query_embedding     halfvec(3072),  -- halfvec (see lot_vectors.embedding — HNSW 2000-dim cap)
     category_mapping    JSONB,          -- resolved lattice path + makes
     included            JSONB,          -- [{value, reason}]
     excluded            JSONB,          -- [{value, reason}]
@@ -50,7 +52,7 @@ CREATE TABLE IF NOT EXISTS reasoning_bank (
 );
 
 CREATE INDEX IF NOT EXISTS reasoning_bank_query_hnsw
-    ON reasoning_bank USING hnsw (query_embedding vector_cosine_ops)
+    ON reasoning_bank USING hnsw (query_embedding halfvec_cosine_ops)
     WITH (m = 16, ef_construction = 64);
 
 -- ---- Grant the workload managed identity (replace <WORKLOAD_MI_NAME>) ----

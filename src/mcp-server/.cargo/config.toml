@@ -1,0 +1,5 @@
+# Keep this standalone PoC self-contained: build artifacts go in ./target, not into
+# any shared/parent target dir set by a higher-level ~/.cargo/config.toml. This repo
+# must never write into unrelated repos (see CLAUDE.md).
+[build]
+target-dir = "target"

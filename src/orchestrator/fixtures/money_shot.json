@@ -1,0 +1,40 @@
+{
+  "_scenario": "Answerable comps query: 'Show me 5 comps for a 2023 John Deere X9 1100'. comps_search returns 5 lots above the similarity floor; analyze fuses and answers with Lot-ID citations. Shapes satisfy comps_search.schema.json + analyze.schema.json output schemas.",
+  "comps_search": {
+    "comps": [
+      { "lot_id": 4412, "similarity": 0.94, "category": "combine", "make_norm": "john deere", "model_norm": "x9 1100", "year": 2023 },
+      { "lot_id": 4380, "similarity": 0.91, "category": "combine", "make_norm": "john deere", "model_norm": "x9 1100", "year": 2023 },
+      { "lot_id": 4501, "similarity": 0.89, "category": "combine", "make_norm": "john deere", "model_norm": "x9 1000", "year": 2022 },
+      { "lot_id": 4290, "similarity": 0.87, "category": "combine", "make_norm": "john deere", "model_norm": "x9 1100", "year": 2023 },
+      { "lot_id": 4188, "similarity": 0.85, "category": "combine", "make_norm": "john deere", "model_norm": "x9 1100", "year": 2022 }
+    ],
+    "low_confidence": false
+  },
+  "structured_query": {
+    "rows": [
+      { "lot_id": 4412, "price": 612000, "sale_date": "2024-11-02", "region": "ND" },
+      { "lot_id": 4380, "price": 598000, "sale_date": "2024-10-18", "region": "SD" },
+      { "lot_id": 4501, "price": 555000, "sale_date": "2024-09-30", "region": "ND" },
+      { "lot_id": 4290, "price": 627000, "sale_date": "2024-12-05", "region": "MN" },
+      { "lot_id": 4188, "price": 540000, "sale_date": "2024-08-22", "region": "ND" }
+    ],
+    "row_count": 5,
+    "filter_notes": "John Deere X9-class combines, 2022-2023, recent sales"
+  },
+  "analyze": {
+    "answer": "Five comparable 2023 John Deere X9 1100 combines sold recently between $540,000 and $627,000, averaging about $586,400.",
+    "classification_receipt": {
+      "category_path": "agriculture > harvesting > combine",
+      "make_model_normalization": "John Deere X9 1100 (2023)",
+      "included": [
+        { "value": "X9 1100", "reason": "exact make/model match" },
+        { "value": "X9 1000", "reason": "same X9 platform, adjacent capacity" }
+      ],
+      "excluded": [],
+      "confidence": 0.93,
+      "reasoningbank_hit": true
+    },
+    "citations": [4412, 4380, 4501, 4290, 4188],
+    "escalate": false
+  }
+}

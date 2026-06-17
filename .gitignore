@@ -15,8 +15,15 @@ local-dev/
 .claude/scheduled_tasks.lock
 .claude/worktrees/
 
-# Rust build output (MCP seam crate)
-src/mcp-server/target/
+# Rust build output (all crates) + Python venvs + ephemeral terraform plan files
+**/target/
+**/.venv/
+*.plan
+
+# Env files (may hold endpoints/keys) — keep only the committed examples.
+.env
+.env.*
+!.env.example
 
 # Terraform (infra/) — caches, state, and filled-in vars are local/secret.
 # Tracked by design: *.tf, terraform.tfvars.example, and .terraform.lock.hcl (version pins).
@@ -30,3 +37,7 @@ crash.*.log
 # Local swarm / sptflo runtime state (machine-local, not a deliverable)
 .spt/
 .sptflo/
+
+# CLIENT-CONFIDENTIAL — Steffes Azure security assessment (live-tenant findings:
+# resource names, public IPs, privileged principal GUIDs). NEVER commit/push.
+Docs/steffes-az-security-assessment.*

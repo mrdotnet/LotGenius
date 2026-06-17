@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+*.tsbuildinfo
+*.local
+# .env is committed: it contains no secrets, only the mock-mode default that
+# makes the console demoable standalone. Ignore local overrides only.
+.env.local
+.env.*.local
+.DS_Store
+*.log

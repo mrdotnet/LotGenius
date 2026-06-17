@@ -1,0 +1,41 @@
+[package]
+name = "admin-shim"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Lot Genius admin classification-review BE shim (Deliverable). Pure pgvector SQL: reads existing lot embeddings, ranks neighbor-disagreement strangers, and writes the deterministic alias/override table. NO Background-IP runtime — no analyze/classify_only, no embedding of new lots (design note §5/§6, PRD §9)."
+license = "LicenseRef-Proprietary"
+publish = false
+
+[[bin]]
+name = "admin-shim"
+path = "src/main.rs"
+
+[[bin]]
+# Seed the DEDICATED `lotgenius_admin` review DB: a copy of the local 384-dim data with a
+# handful of deliberately MISFILED lots so the stranger lane surfaces real disagreements.
+name = "seed_admin"
+path = "src/bin/seed_admin.rs"
+
+[dependencies]
+# Web layer. CORS via tower-http (the FE is a separate Vite origin).
+axum = "0.8"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net"] }
+
+# Data plane: pgvector over async, pooled Postgres. Embeddings are read/ranked as text
+# literals exactly like the rest of the project — no driver vector type needed.
+tokio-postgres = { version = "0.7", features = ["with-uuid-1"] }
+deadpool-postgres = "0.14"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+reqwest = { version = "0.12", default-features = false, features = ["json"] }

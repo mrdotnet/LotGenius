@@ -34,13 +34,14 @@ Governing principle: **vector finds the lots, SQL supplies the trusted numbers.*
 | In this repo (Deliverable) | NOT in this repo (Kadima Background IP) |
 |---|---|
 | Tool **contracts** — `contracts/*.schema.json` | Framework runtime / agent swarm |
-| Server **scaffold** — `server.py` (registers contracts, delegates) | ReasoningBank + memory internals |
-| Packaging — `pyproject.toml` | Reasoning prompts, classification logic |
+| Server **scaffold** — Rust crate `lotgenius-mcp` (`src/main.rs`: registers contracts, delegates) | ReasoningBank + memory internals |
+| Packaging — `Cargo.toml` | Reasoning prompts, classification logic |
 
 The implementation ships as a **built container image** (`lotgenius-mcp`), not as
-source. `server.py` handlers resolve a `lotgenius_runtime` module that exists only
-in that image; without it they raise `NotImplementedError`. **Never vendor the
-runtime into this repo.**
+source. The seam's handlers resolve a `lotgenius_runtime` crate (behind the `runtime`
+cargo feature) that exists only in that image; without it `runtime::connect()` returns a
+"runtime not present" error and the default `cargo` build excludes the dep. **Never vendor
+the runtime into this repo.**
 
 ### The four published tools
 | Tool | Purpose |
@@ -55,7 +56,7 @@ runtime into this repo.**
 ```bash
 # MCP server smoke check (no runtime image needed) — validates every contract
 # loads and every tool has a handler:
-cd src/mcp-server && python server.py
+cd src/mcp-server && cargo run -- --smoke
 
 # Infra (requires Azure auth + PIM role activation):
 cd infra && cp terraform.tfvars.example terraform.tfvars   # then fill in
@@ -67,9 +68,10 @@ Foundry orchestrator** (see `README.md`).
 
 ## Conventions
 
-- **Stack:** Python ≥3.11 (`mcp>=1.2.0`) for the MCP seam; Terraform ≥1.7 with
-  `azurerm ~> 4.20` / `azuread ~> 3.0` for infra. Foundry needs azurerm 4.x (or
-  azapi fallback — see `infra/foundry.tf`).
+- **Stack:** Rust (stable, `rmcp` 1.7) for the MCP seam — a single static-binary image,
+  which strengthens the opaque-image IP posture (PRD §9.5); the JSON contracts stay the
+  language-agnostic interface. Terraform ≥1.7 with `azurerm ~> 4.20` / `azuread ~> 3.0`
+  for infra. Foundry needs azurerm 4.x (or azapi fallback — see `infra/foundry.tf`).
 - **Auth:** Foundry → MCP endpoint over **managed identity**, never a shared key
   (PRD §8.1).
 - **Branded PDFs** are regenerated with the `kadima-pdf` CLI (WeasyPrint); cover/

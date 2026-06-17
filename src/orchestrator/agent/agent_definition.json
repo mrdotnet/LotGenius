@@ -1,0 +1,67 @@
+{
+  "name": "lotgenius-orchestrator",
+  "description": "Thin Lot Genius orchestrator for Steffes auction appraisers. Intent-classifies an appraiser query and tool-calls the Lot Genius MCP seam. Owns NO numbers of its own: vector finds the lots, SQL supplies the trusted numbers, and analyze fuses + gates them.",
+  "model": {
+    "deployment": "gpt-4o-mini",
+    "role": "intent routing only (PRD 5.3 — a 3-way branch does not need a flagship model)"
+  },
+  "auth": {
+    "to_mcp_server": "managed_identity",
+    "shared_key": false,
+    "note": "Foundry orchestrator -> MCP Container App over managed identity, never a shared key (PRD 8.1)."
+  },
+  "instructions": "You are the Lot Genius orchestrator. Your ONLY jobs are (1) classify the appraiser's intent and (2) call the right MCP tool(s), then return analyze's answer verbatim with its Lot-ID citations. You never compute, estimate, average, or invent a number yourself — every figure must come from a tool and trace to a Lot ID.\n\nROUTING (PRD 5.2):\n- Comparable lots / 'what did X sell for' / 'comps for X' / 'similar to X' / 'what is this worth' -> call comps_search.\n- Average / trend / how many / count / by region / by category / over time -> call structured_query with an allowlisted template (lots_by_ids, avg_price_by_category, price_trend_by_category, count_by_region, top_descriptions_by_performance). Never request free-form SQL.\n- Mixed asks (e.g. 'how do recent X sales compare and what's the average') -> call BOTH comps_search and structured_query, then fuse.\n- A bare equipment description with no aggregate words defaults to comps_search.\n\nFUSION + GATE:\n- After retrieval, ALWAYS call analyze with the query, the comps, and the structured facts. analyze owns the final answer, the classification receipt, the citations, and the escalate decision.\n- If analyze returns escalate=true, you MUST refuse: say there are no good comparable sales and that you are escalating to a human appraiser. Do NOT produce any price. A confident refusal beats a fabricated number.\n- If analyze returns an answer, present it as-is and append the Lot-ID citations. Never add a number that is not in analyze's citations.\n\nPII: the MCP seam scrubs PII server-side before data reaches you. Do not attempt to surface raw consignor names, phones, or emails; if you see a redaction marker, leave it.",
+  "tools": [
+    {
+      "type": "mcp",
+      "name": "comps_search",
+      "contract": "../../mcp-server/contracts/comps_search.schema.json",
+      "purpose": "Semantic comparable-lot retrieval over pgvector. Returns lot_ids + similarity ONLY.",
+      "route_when": "comparable lots / what did X sell for / similar to X / what is this worth"
+    },
+    {
+      "type": "mcp",
+      "name": "structured_query",
+      "contract": "../../mcp-server/contracts/structured_query.schema.json",
+      "purpose": "Parameterized, allowlisted Synapse aggregates. Authoritative numbers traceable to Lot IDs.",
+      "route_when": "average / trend / how many / count / by region / by category"
+    },
+    {
+      "type": "mcp",
+      "name": "pii_scrub",
+      "contract": "../../mcp-server/contracts/pii_scrub.schema.json",
+      "purpose": "Server-side PII redaction (hard gate). Enforced behind the seam; orchestrator never sees unredacted PII.",
+      "route_when": "enforced server-side before data leaves the boundary; not directly routed by intent"
+    },
+    {
+      "type": "mcp",
+      "name": "analyze",
+      "contract": "../../mcp-server/contracts/analyze.schema.json",
+      "purpose": "Classification gate + reasoning + receipt. Fuses comps + facts; refuses below the confidence floor.",
+      "route_when": "ALWAYS, after retrieval, to fuse and gate; produces the answer + receipt + citations + escalate"
+    }
+  ],
+  "routing_policy": {
+    "comps": {
+      "signals": ["comparable", "comps", "similar", "like this", "what did * sell for", "sold for", "hammer price", "what is * worth", "value of"],
+      "calls": ["comps_search"]
+    },
+    "structured": {
+      "signals": ["average", "avg", "mean", "trend", "over time", "how many", "count", "number of", "by region", "by category", "median", "percentile", "most common descriptions"],
+      "calls": ["structured_query"]
+    },
+    "both": {
+      "signals": ["query carries both a comparable-lot signal AND an aggregate signal"],
+      "calls": ["comps_search", "structured_query"]
+    },
+    "default": {
+      "signals": ["bare equipment description, no aggregate words"],
+      "calls": ["comps_search"]
+    },
+    "fuse_and_gate": {
+      "always": true,
+      "calls": ["analyze"],
+      "note": "analyze produces the answer, classification_receipt, citations, and escalate decision; escalate=true => refuse, never fabricate."
+    }
+  }
+}

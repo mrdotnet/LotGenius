@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lotgenius-orchestrator"
+version = "0.1.0"
+description = "Thin Foundry orchestrator for the Lot Genius PoC — intent-classify + MCP tool-calling (client-side deliverable)."
+requires-python = ">=3.11"
+authors = [{ name = "Kadima Consulting" }]
+# Runtime deps for the *deployable* Foundry path. The offline harness + tests
+# need none of these (they import lazily). Pinned loosely per PoC convention.
+dependencies = []
+
+[project.optional-dependencies]
+# Installed only when deploying to Foundry / talking to the live MCP seam.
+azure = [
+  "azure-ai-projects>=1.0.0b1",
+  "azure-identity>=1.16.0",
+  "mcp>=1.2.0",
+]
+test = [
+  "pytest>=8.0",
+  "jsonschema>=4.21",
+  "ruff>=0.4",
+  "mypy>=1.10",
+  "fastapi>=0.110",
+  "httpx>=0.27",
+]
+# Local demo chat client (the Teams stand-in web app). Vanilla-JS page, no build.
+web = [
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+  "mcp>=1.2.0",
+]
+
+[project.scripts]
+lotgenius-harness = "harness:main"
+
+[tool.setuptools]
+packages = ["lotgenius_orchestrator", "lotgenius_orchestrator.webapp"]
+py-modules = ["harness"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+# Conservative, fast lint gate: pycodestyle, pyflakes, isort, bugbear, pyupgrade.
+select = ["E", "F", "I", "B", "UP"]
+# UP042: keep `class Intent(str, Enum)` — the str-mixin is intentional so
+# Intent values JSON-serialize and compare as plain strings on 3.11. StrEnum
+# changes str() semantics; not worth the churn for a PoC.
+ignore = ["UP042"]
+
+[tool.ruff.lint.per-file-ignores]
+# page.py is a self-contained HTML/JS asset embedded as a string; long HTML
+# attribute lines are natural and not worth wrapping.
+"lotgenius_orchestrator/webapp/page.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+# Type-check the package only; tests and the Azure-lazy seam stay light.
+files = ["lotgenius_orchestrator", "harness.py"]
+ignore_missing_imports = true
+warn_unused_ignores = false
+check_untyped_defs = true

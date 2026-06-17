@@ -52,7 +52,9 @@ resource "azurerm_postgresql_flexible_server_active_directory_administrator" "ad
   tenant_id           = var.tenant_id
   object_id           = var.lot_genius_admins_group_object_id
   principal_name      = var.pg_admin_login
-  principal_type      = "Group"
+  # "Group" by default (object_id is the Steffes admins group). Flip to "User"
+  # via var.pg_admin_principal_type for the operator-UPN stopgap — config, not code.
+  principal_type = var.pg_admin_principal_type
 }
 
 # Build-time operator access (tighten/remove beyond PoC).

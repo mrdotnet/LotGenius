@@ -1,0 +1,25 @@
+{
+  "_scenario": "Below-the-floor comps query: an obscure / out-of-domain item with no good comparable sales. comps_search returns nothing above min_similarity (low_confidence=true); analyze escalates rather than fabricate. SC2 / Q-REFUSE: the answer must surface as 'no good comps', never a number.",
+  "comps_search": {
+    "comps": [],
+    "low_confidence": true
+  },
+  "structured_query": {
+    "rows": [],
+    "row_count": 0,
+    "filter_notes": "no lots matched the requested scope"
+  },
+  "analyze": {
+    "_answer_note": "answer is omitted entirely when escalating — the contract types answer as string and it is not in `required`; analyze emits no priced answer below the floor.",
+    "classification_receipt": {
+      "category_path": "unclassified",
+      "make_model_normalization": "could not normalize make/model with confidence",
+      "included": [],
+      "excluded": [],
+      "confidence": 0.21,
+      "reasoningbank_hit": false
+    },
+    "citations": [],
+    "escalate": true
+  }
+}

@@ -58,13 +58,23 @@ resource "azurerm_container_app" "mcp" {
 
   template {
     min_replicas = 1
-    max_replicas = 3
+    # Single replica: the seam's streamable-HTTP session manager is in-memory per replica,
+    # so MCP sessions must not be split across replicas (PoC scope; add ingress session
+    # affinity or a shared session store before scaling out).
+    max_replicas = 1
 
     container {
       name   = "mcp-server"
-      image  = "${azurerm_container_registry.acr.login_server}/lotgenius-mcp:latest" # TODO: push built image
+      image  = "${azurerm_container_registry.acr.login_server}/lotgenius-mcp:latest"
       cpu    = 0.5
       memory = "1Gi"
+
+      # Select the streamable-HTTP transport on :8080 (default binary transport is stdio).
+      # Foundry reaches /mcp over managed identity (PRD §5.1/§8.1).
+      env {
+        name  = "LOTGENIUS_HTTP_ADDR"
+        value = "0.0.0.0:8080"
+      }
 
       # Endpoints/keys injected as secrets/MIs — never the framework source.
       env {
@@ -103,7 +113,11 @@ resource "azurerm_container_app" "mcp" {
 }
 
 # ---- Embedding / ETL job: Synapse -> Azure OpenAI embeddings -> pgvector ----
+# Opt-in: ARM validates the image at create time, so this can only be applied once the
+# ETL image `lotgenius-embed:latest` is built & pushed to ACR (Background-IP/ETL artifact,
+# delivered separately like the runtime image). Flip var.deploy_embed_job=true then apply.
 resource "azurerm_container_app_job" "embed" {
+  count                        = var.deploy_embed_job ? 1 : 0
   name                         = "${local.prefix}-embed-${local.suffix}"
   container_app_environment_id = azurerm_container_app_environment.cae.id
   resource_group_name          = local.rg_name

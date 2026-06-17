@@ -1,0 +1,36 @@
+{
+  "_scenario": "Mixed query: 'How do recent John Deere X9 sales compare, and what's the average price by region?'. Carries BOTH a comparable-lot signal and an aggregate signal -> routes to comps_search AND structured_query, then analyze fuses both.",
+  "comps_search": {
+    "comps": [
+      { "lot_id": 4412, "similarity": 0.93, "category": "combine", "make_norm": "john deere", "model_norm": "x9 1100", "year": 2023 },
+      { "lot_id": 4380, "similarity": 0.90, "category": "combine", "make_norm": "john deere", "model_norm": "x9 1100", "year": 2023 },
+      { "lot_id": 4501, "similarity": 0.88, "category": "combine", "make_norm": "john deere", "model_norm": "x9 1000", "year": 2022 }
+    ],
+    "low_confidence": false
+  },
+  "structured_query": {
+    "rows": [
+      { "region": "ND", "avg_price": 569000, "n": 12 },
+      { "region": "SD", "avg_price": 598000, "n": 5 },
+      { "region": "MN", "avg_price": 627000, "n": 3 }
+    ],
+    "row_count": 3,
+    "filter_notes": "average John Deere X9 combine price grouped by region"
+  },
+  "analyze": {
+    "answer": "Recent John Deere X9 combine sales cluster between $555,000 and $627,000. By region, the average is $569,000 in ND, $598,000 in SD, and $627,000 in MN.",
+    "classification_receipt": {
+      "category_path": "agriculture > harvesting > combine",
+      "make_model_normalization": "John Deere X9 (1100 / 1000)",
+      "included": [
+        { "value": "X9 1100", "reason": "exact platform match" },
+        { "value": "X9 1000", "reason": "same X9 platform" }
+      ],
+      "excluded": [],
+      "confidence": 0.9,
+      "reasoningbank_hit": true
+    },
+    "citations": [4412, 4380, 4501],
+    "escalate": false
+  }
+}

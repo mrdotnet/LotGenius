@@ -1,0 +1,66 @@
+[package]
+name = "lotgenius-mcp"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Lot Genius MCP server seam — publishes four typed tool CONTRACTS and delegates every call to Kadima's agentic-AI-framework runtime (Background IP, delivered as a built image, never vendored here). PRD §5.1 / §9."
+license = "LicenseRef-Proprietary"
+publish = false
+
+[[bin]]
+name = "lotgenius-mcp"
+path = "src/main.rs"
+
+[dependencies]
+# The runtime INTERFACE (trait + boundary error). A committed Deliverable crate — it
+# holds NO tool logic and NO runtime, just the published `LotGeniusRuntime` trait both
+# sides of the IP boundary share. Referencing it by default is fine (it is on disk and
+# carries no implementation); the Background-IP `lotgenius_runtime` crate below is the
+# one that must never be referenced by the default build.
+lotgenius-contract = { path = "../lotgenius-contract" }
+
+# Official Rust MCP SDK. "server" pulls in the ServerHandler trait + async-rw
+# transport; "transport-io" gives us stdio() for the scaffold. We deliberately do
+# NOT enable the "macros" #[tool] attribute — our four tool schemas are the JSON
+# contracts under ./contracts, which must remain the single source of truth.
+rmcp = { version = "1.7", default-features = false, features = ["server", "transport-io", "transport-streamable-http-server"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std", "net", "signal"] }
+# Production transport: the same ServerHandler mounted on streamable-HTTP (:8080) inside the
+# Azure Container App, reached by Foundry over managed identity (PRD §5.1/§8.1). The scaffold
+# default stays stdio; HTTP is selected at runtime (env LOTGENIUS_HTTP_ADDR / --http).
+axum = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# --- IP boundary (PRD §9) -----------------------------------------------------
+# The Kadima agentic-AI-framework runtime is Background IP. It is supplied ONLY by
+# the `lotgenius-mcp` container image build, never vendored into this repo.
+#
+# It is wired as an OPTIONAL dependency. Cargo resolves *every declared* dependency
+# at lock time regardless of feature state, so a dependency line pointing at a crate
+# that is absent from this repo would break the DEFAULT `cargo check`. Therefore the
+# dependency line is NOT committed here — it is injected by the image build, which
+# appends it under `[dependencies]` and builds with `--features runtime`:
+#
+#     # appended by Kadima's image build only:
+#     lotgenius_runtime = { path = "/build/lotgenius_runtime", optional = true }
+#     # (or a private registry coordinate)
+#
+# The `runtime` feature below activates that optional dependency (`dep:lotgenius_runtime`)
+# and the `#[cfg(feature = "runtime")]` delegation arm in `src/runtime.rs`. Because no
+# such dependency is declared by default, a default checkout `cargo check`s cleanly
+# with NO runtime crate present on disk — this repo ships CONTRACTS only.
+
+[features]
+# Default = the client-facing DELIVERABLE: contracts + seam, no implementation.
+default = []
+# Compile-time switch for the delegation arm in `src/runtime.rs`. Declared as a plain
+# feature so the DEFAULT manifest references no absent crate and `cargo check`s clean.
+# Kadima's image build injects the optional dependency line (see note above) AND adds
+# its activation here, turning this into:
+#     runtime = ["dep:lotgenius_runtime"]
+# then builds with `--features runtime`.
+runtime = []

@@ -1,0 +1,2 @@
+[console_scripts]
+lotgenius-harness = harness:main

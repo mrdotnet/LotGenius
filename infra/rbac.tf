@@ -8,8 +8,10 @@
 # on the service principal) so the app doesn't break when an activation lapses.
 
 # MCP server / job -> call Azure OpenAI (embeddings, intent, reasoning) at runtime.
+# Scoped to the AI Services account that actually HOSTS the model deployments — an
+# OpenAI User role on the Foundry hub would NOT grant data-plane access to them.
 resource "azurerm_role_assignment" "workload_openai_user" {
-  scope                = azurerm_ai_foundry.this.id # TODO: scope to the AI Services account if distinct
+  scope                = azurerm_cognitive_account.aiservices.id
   role_definition_name = "Cognitive Services OpenAI User"
   principal_id         = azurerm_user_assigned_identity.workload.principal_id
 }

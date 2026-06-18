@@ -28,6 +28,12 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net
 tokio-postgres = { version = "0.7", features = ["with-uuid-1"] }
 deadpool-postgres = "0.14"
 
+# PROD connection to Azure Database for PostgreSQL (TLS + Entra token as password) so the
+# admin app can manage the real identity tables. rustls (no system OpenSSL); local stays NoTls.
+tokio-postgres-rustls = "0.13"
+rustls = "0.23"
+webpki-roots = "0.26"
+
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"

@@ -9,8 +9,9 @@
 pub mod api;
 pub mod config;
 pub mod db;
+pub mod identity;
 
-use axum::routing::{get, post};
+use axum::routing::{delete, get, patch, post};
 use axum::Router;
 use deadpool_postgres::Pool;
 use tower_http::cors::{Any, CorsLayer};
@@ -33,6 +34,25 @@ pub fn router(state: AppState) -> Router {
         .route("/admin/override", post(api::post_override))
         .route("/admin/undo", post(api::post_undo))
         .route("/admin/recompute", post(api::post_recompute))
+        // ---- Identity + ABAC group management (comprehensive admin app) ----
+        .route(
+            "/admin/groups",
+            get(identity::list_groups).post(identity::create_group),
+        )
+        .route(
+            "/admin/groups/{id}",
+            patch(identity::update_group).delete(identity::delete_group),
+        )
+        .route(
+            "/admin/users",
+            get(identity::list_users).post(identity::upsert_user),
+        )
+        .route("/admin/users/{id}/groups", post(identity::assign_group))
+        .route(
+            "/admin/users/{id}/groups/{gid}",
+            delete(identity::remove_group),
+        )
+        .route("/admin/users/{id}/permissions", get(identity::resolve))
         .route("/health", get(|| async { "ok" }))
         .layer(cors)
         .with_state(state)

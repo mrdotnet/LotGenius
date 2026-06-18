@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::config::PgConfig;
 
-/// Build a pooled connection to the admin review DB.
+/// Build a pooled connection to the LOCAL admin review DB (NoTls).
 pub fn build_pool(cfg: &PgConfig) -> Result<Pool> {
     let pg_cfg: tokio_postgres::Config = cfg
         .conn_string()
@@ -28,6 +28,34 @@ pub fn build_pool(cfg: &PgConfig) -> Result<Pool> {
         .max_size(8)
         .build()
         .context("build pg pool")
+}
+
+/// Build a PROD pool against Azure Database for PostgreSQL: rustls TLS + the Entra token as the
+/// password (from PGPASSWORD). deadpool_postgres::Manager type-erases the TLS connector, so the
+/// Pool type is identical to the local one — handlers are unchanged.
+pub fn build_prod_pool(cfg: &PgConfig) -> Result<Pool> {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+    let mut pg_cfg = cfg.tp_config();
+    pg_cfg.ssl_mode(tokio_postgres::config::SslMode::Require);
+
+    let mut roots = rustls::RootCertStore::empty();
+    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    let tls = tokio_postgres_rustls::MakeRustlsConnect::new(
+        rustls::ClientConfig::builder()
+            .with_root_certificates(roots)
+            .with_no_client_auth(),
+    );
+    let mgr = Manager::from_config(
+        pg_cfg,
+        tls,
+        ManagerConfig {
+            recycling_method: RecyclingMethod::Fast,
+        },
+    );
+    Pool::builder(mgr)
+        .max_size(8)
+        .build()
+        .context("build prod pg pool")
 }
 
 /// A materialized stranger row, as the review lane needs it.

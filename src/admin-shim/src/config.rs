@@ -31,12 +31,31 @@ impl Default for PgConfig {
     }
 }
 
+/// True when the shim should connect to Azure PG (TLS + Entra token), not the local container.
+/// Set `LOTGENIUS_PG_AZURE=1` and `PGPASSWORD=<oss-rdbms token>` for the deployed admin app.
+pub fn is_prod() -> bool {
+    env::var("LOTGENIUS_PG_AZURE")
+        .map(|v| matches!(v.as_str(), "1" | "true" | "TRUE"))
+        .unwrap_or(false)
+}
+
 impl PgConfig {
     pub fn conn_string(&self) -> String {
         format!(
             "host={} port={} user={} password={} dbname={}",
             self.host, self.port, self.user, self.password, self.dbname
         )
+    }
+
+    /// Programmatic `tokio_postgres::Config` (space-safe for users like `Lot Genius Admins`).
+    pub fn tp_config(&self) -> tokio_postgres::Config {
+        let mut c = tokio_postgres::Config::new();
+        c.host(&self.host)
+            .port(self.port)
+            .user(&self.user)
+            .dbname(&self.dbname)
+            .password(&self.password);
+        c
     }
 
     /// Connection against the maintenance `postgres` DB — used by the seeder to

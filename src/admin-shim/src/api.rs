@@ -250,7 +250,7 @@ pub struct ApiError {
 }
 
 impl ApiError {
-    fn bad_request(msg: impl Into<String>) -> Self {
+    pub fn bad_request(msg: impl Into<String>) -> Self {
         Self {
             status: StatusCode::BAD_REQUEST,
             message: msg.into(),

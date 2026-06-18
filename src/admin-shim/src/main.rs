@@ -9,8 +9,8 @@
 
 use anyhow::{Context, Result};
 
-use admin_shim::config::{bind_addr, PgConfig};
-use admin_shim::db::build_pool;
+use admin_shim::config::{bind_addr, is_prod, PgConfig};
+use admin_shim::db::{build_pool, build_prod_pool};
 use admin_shim::{router, AppState};
 
 #[tokio::main]
@@ -22,18 +22,19 @@ async fn main() -> Result<()> {
         .init();
 
     let cfg = PgConfig::default();
-    let pool = build_pool(&cfg)?;
-    // Fail fast with a clear message if the review DB is unreachable / unseeded.
+    // PROD (LOTGENIUS_PG_AZURE=1): Azure PG over TLS + Entra token (PGPASSWORD); else the local
+    // review container.
+    let pool = if is_prod() {
+        build_prod_pool(&cfg)?
+    } else {
+        build_pool(&cfg)?
+    };
+    // Fail fast with a clear message if the DB is unreachable.
     {
-        let c = pool.get().await.context(
-            "cannot reach the lotgenius_admin review DB — run `cargo run --bin seed_admin` first \
-             (and ensure the lotgenius-pg-local container is up on :5433)",
-        )?;
-        let _: i64 = c
-            .query_one("SELECT count(*) FROM curated_lots", &[])
+        let _c = pool
+            .get()
             .await
-            .context("lotgenius_admin schema missing — run `cargo run --bin seed_admin`")?
-            .get(0);
+            .context("cannot reach the admin Postgres (check connection/creds; local needs seed_admin)")?;
     }
 
     let addr = bind_addr();

@@ -56,6 +56,11 @@ resource "azurerm_cognitive_account" "aiservices" {
   sku_name              = "S0"
   custom_subdomain_name = "${local.prefix}-aisvc-${local.suffix}"
 
+  # Required for the Foundry Agent Service (account-project model) — the lotgenius-agents
+  # project + the lotgenius-orchestrator agent live under this account. Must stay true or
+  # Terraform tries to replace the account (which 409s on the nested project).
+  project_management_enabled = true
+
   identity {
     type = "SystemAssigned"
   }
@@ -81,8 +86,9 @@ resource "azurerm_cognitive_deployment" "embedding" {
     version = "1"
   }
   sku {
-    name     = "GlobalStandard"
-    capacity = 50
+    name = "GlobalStandard"
+    # Higher TPM for batch embedding (full-corpus ETL); well within the 1000 quota.
+    capacity = 300
   }
 }
 

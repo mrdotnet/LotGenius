@@ -44,8 +44,7 @@ async fn main() -> Result<()> {
         "tools": [{
             "type": "mcp",
             "server_label": "lotgenius",
-            "server_url": mcp_url,
-            "require_approval": "never"
+            "server_url": mcp_url
         }]
     });
 

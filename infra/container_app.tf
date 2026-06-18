@@ -76,27 +76,54 @@ resource "azurerm_container_app" "mcp" {
         value = "0.0.0.0:8080"
       }
 
-      # Endpoints/keys injected as secrets/MIs — never the framework source.
+      # ---- Runtime: prod profile against the Azure data planes over managed identity ----
+      # No secrets/keys — the workload MI (AZURE_CLIENT_ID) mints tokens for Postgres
+      # (oss-rdbms) and Azure OpenAI (cognitiveservices) at runtime. structured_query reads
+      # the authoritative numbers from curated_lots in Postgres (mirrored from Synapse by the
+      # embed job), so the seam needs no live Synapse connection.
       env {
-        name  = "PG_FQDN"
+        name  = "LOTGENIUS_PROFILE"
+        value = "prod"
+      }
+      env {
+        name  = "LOTGENIUS_PG_AZURE"
+        value = "1"
+      }
+      env {
+        name  = "PGHOST"
         value = azurerm_postgresql_flexible_server.pg.fqdn
       }
       env {
-        name  = "PG_DATABASE"
+        name  = "PGDATABASE"
         value = azurerm_postgresql_flexible_server_database.appdb.name
       }
       env {
-        name  = "FOUNDRY_PROJECT_ENDPOINT"
-        value = "" # TODO: azurerm_ai_foundry_project endpoint output once exposed
+        name  = "PGUSER"
+        value = azurerm_user_assigned_identity.workload.name
+      }
+      env {
+        name  = "PGPORT"
+        value = "5432"
       }
       env {
         name  = "AZURE_CLIENT_ID"
         value = azurerm_user_assigned_identity.workload.client_id
       }
-      # Synapse connection details for the structured_query tool (read-only MI).
       env {
-        name  = "SYNAPSE_SQL_ENDPOINT"
-        value = "" # TODO: existing Synapse serverless endpoint
+        name  = "AOAI_ENDPOINT"
+        value = "https://${azurerm_cognitive_account.aiservices.custom_subdomain_name}.openai.azure.com"
+      }
+      env {
+        name  = "AOAI_EMBED_DEPLOYMENT"
+        value = azurerm_cognitive_deployment.embedding.name
+      }
+      env {
+        name  = "AOAI_REASONING_DEPLOYMENT"
+        value = azurerm_cognitive_deployment.reasoning.name
+      }
+      env {
+        name  = "AOAI_API_VERSION"
+        value = "2025-04-01-preview" # gpt-5 needs a recent version (max_completion_tokens)
       }
     }
   }

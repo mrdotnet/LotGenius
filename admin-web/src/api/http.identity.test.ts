@@ -186,6 +186,8 @@ describe("http identity client — request shapes", () => {
       can_see_pii: true,
       can_admin: true,
       groups: ["basic", "admins"],
+      visible_field_classes: ["consignor", "winning_bidder"],
+      visible_columns: ["curated_lots.consignor_name"],
     };
     const { calls } = stubFetch(perms);
     const api = createHttpApi(BASE);

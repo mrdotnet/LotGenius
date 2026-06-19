@@ -916,3 +916,19 @@ body {
   font-size: 13px;
   padding-bottom: 8px;
 }
+
+/* ── PII access view (P4 ABAC field-class matrix) ── */
+.pii-matrix th[scope="col"] {
+  text-align: center;
+  white-space: nowrap;
+}
+.pii-matrix th[scope="row"] {
+  text-align: left;
+  font-weight: 600;
+}
+.pii-cell {
+  text-align: center;
+}
+.pii-cell input[type="checkbox"] {
+  cursor: pointer;
+}

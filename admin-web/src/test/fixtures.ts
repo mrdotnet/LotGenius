@@ -83,8 +83,30 @@ export function makeFakeApi(initial: Stranger[]): {
     async assignGroup() {},
     async removeGroup() {},
     async resolvePermissions() {
-      return { clearance_tier: 0, can_see_pii: false, can_admin: false, groups: [] };
+      return {
+        clearance_tier: 0,
+        can_see_pii: false,
+        can_admin: false,
+        groups: [],
+        visible_field_classes: [],
+        visible_columns: [],
+      };
     },
+    // P4 ABAC methods are unused by the review-lane hero flow; no-op stubs keep this
+    // fake conformant with the extended AdminApi surface.
+    async listFieldClasses() {
+      return [];
+    },
+    async listFieldGrants() {
+      return [];
+    },
+    async grantFieldClass() {},
+    async revokeFieldClass() {},
+    async listColumnTags() {
+      return [];
+    },
+    async tagColumn() {},
+    async untagColumn() {},
   };
 
   return { api, calls };

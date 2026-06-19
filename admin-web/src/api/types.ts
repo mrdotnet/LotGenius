@@ -123,6 +123,35 @@ export interface Permissions {
   can_see_pii: boolean;
   can_admin: boolean;
   groups: string[];
+  /** P4: field classes the caller's effective groups grant. */
+  visible_field_classes: string[];
+  /** P4: concrete `table.column` the caller may see (grants ⨝ column tags). */
+  visible_columns: string[];
+}
+
+// ─── P4 ABAC field-class model ─────────────────────────────────────────────
+// The data-driven per-field allowlist the MCP seam enforces. These mirror the
+// admin-shim `abac` module exactly. Enforcement is a per-field allowlist, not a
+// name blocklist: a column NOT tagged is treated as PII (deny-by-default).
+
+/** A PII field class — the taxonomy `column_tags` map columns into. */
+export interface FieldClass {
+  class_name: string;
+  description: string | null;
+}
+
+/** One cell of the group×field-class matrix (`group_field_grants`). */
+export interface FieldGrant {
+  group_name: string;
+  field_class: string;
+  granted: boolean;
+}
+
+/** A field→class registry entry (`column_tags`): `table.column` → field class. */
+export interface ColumnTag {
+  table_name: string;
+  column_name: string;
+  field_class: string;
 }
 
 /** `POST /admin/groups` response. */
@@ -149,4 +178,17 @@ export interface AdminApi {
   assignGroup(userId: string, groupId: number): Promise<void>;
   removeGroup(userId: string, groupId: number): Promise<void>;
   resolvePermissions(userId: string): Promise<Permissions>;
+
+  // ── P4 ABAC field-class model ──
+  listFieldClasses(): Promise<FieldClass[]>;
+  listFieldGrants(): Promise<FieldGrant[]>;
+  grantFieldClass(groupName: string, fieldClass: string): Promise<void>;
+  revokeFieldClass(groupName: string, fieldClass: string): Promise<void>;
+  listColumnTags(): Promise<ColumnTag[]>;
+  tagColumn(
+    tableName: string,
+    columnName: string,
+    fieldClass: string,
+  ): Promise<void>;
+  untagColumn(tableName: string, columnName: string): Promise<void>;
 }

@@ -31,10 +31,9 @@ async fn main() -> Result<()> {
     };
     // Fail fast with a clear message if the DB is unreachable.
     {
-        let _c = pool
-            .get()
-            .await
-            .context("cannot reach the admin Postgres (check connection/creds; local needs seed_admin)")?;
+        let _c = pool.get().await.context(
+            "cannot reach the admin Postgres (check connection/creds; local needs seed_admin)",
+        )?;
     }
 
     let addr = bind_addr();

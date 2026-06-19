@@ -4,6 +4,7 @@ import { Tabs, type TabDef } from "./components/Tabs";
 import { ReviewView } from "./views/ReviewView";
 import { SourceCurationView } from "./views/SourceCurationView";
 import { UsersGroupsView } from "./views/UsersGroupsView";
+import { PiiAccessView } from "./views/PiiAccessView";
 import { CalibrationView } from "./views/CalibrationView";
 
 interface AppProps {
@@ -14,6 +15,7 @@ const TABS: TabDef[] = [
   { id: "review", label: "Review" },
   { id: "curation", label: "Source curation" },
   { id: "users", label: "Users & Groups" },
+  { id: "pii", label: "PII access" },
   { id: "calibration", label: "Calibration" },
 ];
 
@@ -40,6 +42,7 @@ export function App({ api }: AppProps) {
       {tab === "review" && <ReviewView api={api} />}
       {tab === "curation" && <SourceCurationView api={api} />}
       {tab === "users" && <UsersGroupsView api={api} />}
+      {tab === "pii" && <PiiAccessView api={api} />}
       {tab === "calibration" && <CalibrationView api={api} />}
     </div>
   );

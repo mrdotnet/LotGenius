@@ -6,7 +6,10 @@
 // makes the optimistic-reflow + Undo hero flow demoable without the Rust shim.
 import type {
   AdminApi,
+  ColumnTag,
   DryRunResponse,
+  FieldClass,
+  FieldGrant,
   Group,
   GroupCreated,
   GroupPerms,
@@ -91,6 +94,31 @@ const SEED_USERS: MockUser[] = [
   { id: "n.newhire@steffes.com", display_name: "Nima Newhire", email: "n.newhire@steffes.com", last_seen: null, groupIds: [] },
 ];
 
+// ─── P4 ABAC field-class model (mirrors the admin-shim `abac` module) ────────
+// Enforcement is a data-driven per-field allowlist. The matrix and tags below
+// reflect the locked model; a column NOT tagged is treated as PII.
+const SEED_FIELD_CLASSES: FieldClass[] = [
+  { class_name: "consignor", description: "Seller identity — name / phone / contract party" },
+  { class_name: "winning_bidder", description: "Winning bidder identity on a lot" },
+  { class_name: "bid_invoice_buyer", description: "Buyer identity on a bid / invoice" },
+  { class_name: "internal_people", description: "Internal Steffes staff identities" },
+];
+
+// The group×field-class matrix, keyed by the mock group names. Locked model:
+//   basic → none · appraisers → {consignor} · pii-cleared & admins → all four.
+const ALL_CLASSES: string[] = SEED_FIELD_CLASSES.map((f) => f.class_name);
+const SEED_GRANTS: FieldGrant[] = [
+  { group_name: "appraisers", field_class: "consignor", granted: true },
+  ...ALL_CLASSES.map((c) => ({ group_name: "pii-cleared", field_class: c, granted: true })),
+  ...ALL_CLASSES.map((c) => ({ group_name: "admins", field_class: c, granted: true })),
+];
+
+// The field→class registry. Untagged columns stay deny-by-default PII.
+const SEED_COLUMN_TAGS: ColumnTag[] = [
+  { table_name: "curated_lots", column_name: "consignor_name", field_class: "consignor" },
+  { table_name: "curated_lots", column_name: "consignor_phone", field_class: "consignor" },
+];
+
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
 }
@@ -123,6 +151,35 @@ export function createMockApi(): AdminApi {
   const groups: MockGroup[] = clone(SEED_GROUPS);
   const users: MockUser[] = clone(SEED_USERS);
   let groupSeq = Math.max(...SEED_GROUPS.map((g) => g.id));
+
+  // ── P4 ABAC field-class state ──
+  const fieldClasses: FieldClass[] = clone(SEED_FIELD_CLASSES);
+  // Grants keyed as [group, class] joined by a tab (neither name contains a tab).
+  const grantKey = (g: string, c: string): string => [g, c].join("\t");
+  const grants = new Set<string>(
+    SEED_GRANTS.map((g) => grantKey(g.group_name, g.field_class)),
+  );
+  const columnTags: ColumnTag[] = clone(SEED_COLUMN_TAGS);
+
+  /** Field classes granted to a set of group names (the resolver's union). */
+  const classesForGroups = (groupNames: string[]): string[] => {
+    const out = new Set<string>();
+    for (const g of groupNames) {
+      for (const c of fieldClasses) {
+        if (grants.has(grantKey(g, c.class_name))) out.add(c.class_name);
+      }
+    }
+    return [...out].sort();
+  };
+
+  /** Concrete `table.column` for a set of visible classes (grants ⨝ column tags). */
+  const columnsForClasses = (classes: string[]): string[] => {
+    const set = new Set(classes);
+    return columnTags
+      .filter((t) => set.has(t.field_class))
+      .map((t) => [t.table_name, t.column_name].join("."))
+      .sort();
+  };
 
   const groupById = (id: number) => groups.find((g) => g.id === id);
   const memberCount = (gid: number) =>
@@ -339,14 +396,100 @@ export function createMockApi(): AdminApi {
       const effective = [...effectiveIds]
         .map(groupById)
         .filter((g): g is MockGroup => !!g);
+      const sortedGroups = effective
+        .sort((a, b) => b.clearance_tier - a.clearance_tier || a.name.localeCompare(b.name))
+        .map((g) => g.name);
+      // P4: field-class allowlist, mirroring the SQL resolver.
+      const visibleClasses = classesForGroups(sortedGroups);
+      const visibleColumns = columnsForClasses(visibleClasses);
       return {
         clearance_tier: effective.reduce((m, g) => Math.max(m, g.clearance_tier), 0),
-        can_see_pii: effective.some((g) => g.can_see_pii),
+        // can_see_pii is DERIVED: the caller has at least one field class.
+        can_see_pii: visibleClasses.length > 0,
         can_admin: effective.some((g) => g.can_admin),
-        groups: effective
-          .sort((a, b) => b.clearance_tier - a.clearance_tier || a.name.localeCompare(b.name))
-          .map((g) => g.name),
+        groups: sortedGroups,
+        visible_field_classes: visibleClasses,
+        visible_columns: visibleColumns,
       };
+    },
+
+    // ── P4 ABAC field-class model ──
+    async listFieldClasses(): Promise<FieldClass[]> {
+      await delay();
+      return clone([...fieldClasses].sort((a, b) => a.class_name.localeCompare(b.class_name)));
+    },
+
+    async listFieldGrants(): Promise<FieldGrant[]> {
+      await delay();
+      return [...grants]
+        .map((k) => {
+          const [group_name, field_class] = k.split("\t");
+          return { group_name, field_class, granted: true };
+        })
+        .sort(
+          (a, b) =>
+            a.group_name.localeCompare(b.group_name) ||
+            a.field_class.localeCompare(b.field_class),
+        );
+    },
+
+    async grantFieldClass(groupName: string, fieldClass: string): Promise<void> {
+      await delay();
+      if (!groups.some((g) => g.name === groupName)) throw new Error("no such group");
+      if (!fieldClasses.some((c) => c.class_name === fieldClass)) {
+        throw new Error("no such field class");
+      }
+      grants.add(grantKey(groupName, fieldClass));
+    },
+
+    async revokeFieldClass(groupName: string, fieldClass: string): Promise<void> {
+      await delay();
+      grants.delete(grantKey(groupName, fieldClass));
+    },
+
+    async listColumnTags(): Promise<ColumnTag[]> {
+      await delay();
+      return clone(
+        [...columnTags].sort(
+          (a, b) =>
+            a.table_name.localeCompare(b.table_name) ||
+            a.column_name.localeCompare(b.column_name),
+        ),
+      );
+    },
+
+    async tagColumn(
+      tableName: string,
+      columnName: string,
+      fieldClass: string,
+    ): Promise<void> {
+      await delay();
+      if (!tableName.trim() || !columnName.trim()) {
+        throw new Error("table_name and column_name are required");
+      }
+      if (!fieldClasses.some((c) => c.class_name === fieldClass)) {
+        throw new Error("no such field class");
+      }
+      const existing = columnTags.find(
+        (t) => t.table_name === tableName && t.column_name === columnName,
+      );
+      if (existing) {
+        existing.field_class = fieldClass;
+      } else {
+        columnTags.push({
+          table_name: tableName,
+          column_name: columnName,
+          field_class: fieldClass,
+        });
+      }
+    },
+
+    async untagColumn(tableName: string, columnName: string): Promise<void> {
+      await delay();
+      const i = columnTags.findIndex(
+        (t) => t.table_name === tableName && t.column_name === columnName,
+      );
+      if (i >= 0) columnTags.splice(i, 1);
     },
   };
 }

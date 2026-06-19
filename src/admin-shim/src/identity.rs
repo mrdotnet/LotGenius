@@ -12,7 +12,11 @@ use crate::api::ApiError;
 use crate::AppState;
 
 async fn conn(s: &AppState) -> Result<deadpool_postgres::Object, ApiError> {
-    s.pool.get().await.map_err(anyhow::Error::from).map_err(Into::into)
+    s.pool
+        .get()
+        .await
+        .map_err(anyhow::Error::from)
+        .map_err(Into::into)
 }
 
 // ---- Groups -------------------------------------------------------------------------------
@@ -122,9 +126,12 @@ pub async fn update_group(
     .await
     .map_err(anyhow::Error::from)?;
     if let Some(d) = &p.description {
-        c.execute("UPDATE app_groups SET description=$2 WHERE id=$1", &[&id, d])
-            .await
-            .map_err(anyhow::Error::from)?;
+        c.execute(
+            "UPDATE app_groups SET description=$2 WHERE id=$1",
+            &[&id, d],
+        )
+        .await
+        .map_err(anyhow::Error::from)?;
     }
     Ok(Json(json!({ "updated": true })))
 }
@@ -260,10 +267,14 @@ pub struct PermsDto {
     pub can_see_pii: bool,
     pub can_admin: bool,
     pub groups: Vec<String>,
+    /// P4: the field classes the caller's effective groups grant.
+    pub visible_field_classes: Vec<String>,
+    /// P4: concrete `table.column` the caller may see (group_field_grants ⨝ column_tags).
+    pub visible_columns: Vec<String>,
 }
 
 /// Effective permissions for a caller (the same resolver the seam uses) — for the admin UI to
-/// preview "what would this user see".
+/// preview "what would this user see", now including the P4 field-class allowlist.
 pub async fn resolve(
     State(s): State<AppState>,
     Path(uid): Path<String>,
@@ -271,7 +282,9 @@ pub async fn resolve(
     let c = conn(&s).await?;
     let r = c
         .query_one(
-            "SELECT clearance_tier, can_see_pii, can_admin, groups FROM app_resolve_permissions($1)",
+            "SELECT clearance_tier, can_see_pii, can_admin, groups, \
+                    visible_field_classes, visible_columns \
+             FROM app_resolve_permissions($1)",
             &[&uid],
         )
         .await
@@ -281,5 +294,7 @@ pub async fn resolve(
         can_see_pii: r.get(1),
         can_admin: r.get(2),
         groups: r.get(3),
+        visible_field_classes: r.get(4),
+        visible_columns: r.get(5),
     }))
 }

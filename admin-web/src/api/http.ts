@@ -1,7 +1,10 @@
 // HTTP implementation of AdminApi — talks to the /admin shim (the Rust BE).
 import type {
   AdminApi,
+  ColumnTag,
   DryRunResponse,
+  FieldClass,
+  FieldGrant,
   Group,
   GroupCreated,
   GroupPerms,
@@ -111,6 +114,54 @@ export function createHttpApi(baseUrl: string): AdminApi {
       return request<Permissions>(
         base,
         `/admin/users/${encodeURIComponent(userId)}/permissions`,
+      );
+    },
+
+    // ── P4 ABAC field-class model ──
+    listFieldClasses() {
+      return request<FieldClass[]>(base, "/admin/field-classes");
+    },
+    listFieldGrants() {
+      return request<FieldGrant[]>(base, "/admin/field-grants");
+    },
+    async grantFieldClass(groupName: string, fieldClass: string) {
+      await request<unknown>(base, "/admin/field-grants", {
+        method: "POST",
+        body: JSON.stringify({
+          group_name: groupName,
+          field_class: fieldClass,
+        }),
+      });
+    },
+    async revokeFieldClass(groupName: string, fieldClass: string) {
+      await request<unknown>(
+        base,
+        `/admin/field-grants/${encodeURIComponent(groupName)}/${encodeURIComponent(fieldClass)}`,
+        { method: "DELETE" },
+      );
+    },
+    listColumnTags() {
+      return request<ColumnTag[]>(base, "/admin/column-tags");
+    },
+    async tagColumn(
+      tableName: string,
+      columnName: string,
+      fieldClass: string,
+    ) {
+      await request<unknown>(base, "/admin/column-tags", {
+        method: "POST",
+        body: JSON.stringify({
+          table_name: tableName,
+          column_name: columnName,
+          field_class: fieldClass,
+        }),
+      });
+    },
+    async untagColumn(tableName: string, columnName: string) {
+      await request<unknown>(
+        base,
+        `/admin/column-tags/${encodeURIComponent(tableName)}/${encodeURIComponent(columnName)}`,
+        { method: "DELETE" },
       );
     },
   };

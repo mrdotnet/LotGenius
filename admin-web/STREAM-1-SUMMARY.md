@@ -99,3 +99,42 @@ and green.
   list endpoint.
 - Wire resolved-permissions PII/admin badges to a real caller-identity envelope
   (Item 3) when that lands.
+
+## TrustValidation pass (independent re-verification — ELORA)
+
+Re-ran the full gate gauntlet from a clean tree on this worktree; cross-checked
+the http client against the **live** shim source — not just the prior summary.
+
+### Gate criterion: `coverage_verified`
+Every Item-1 source file has a dedicated test (9 test files, **42 tests, all
+green**): `Tabs.tsx`→`Tabs.test.tsx`, `api/http.ts`(identity)→`http.identity.test.ts`
+(10 request-shape assertions), `api/mock.ts`(identity)→`mock.identity.test.ts`
+(9), `calibration.ts`→`calibration.test.ts` (5), and each view→its `*.test.tsx`.
+Extracted `ReviewView` stays covered by the unchanged `App.test.tsx`; existing
+`Card.test.tsx` green → review lane not regressed.
+
+### Gate criterion: `integration_tested`
+http client wire shapes verified field-for-field against
+`src/admin-shim/src/{lib.rs,identity.rs}` (source of truth):
+- Routes/methods match exactly: `GET|POST /admin/groups`, `PATCH|DELETE
+  /admin/groups/{id}`, `GET|POST /admin/users`, `POST /admin/users/{id}/groups`,
+  `DELETE /admin/users/{id}/groups/{gid}`, `GET /admin/users/{id}/permissions`.
+- DTO fields match: `GroupDto`/`Group`, `NewGroup`, `GroupPerms`, `UserDto`/`User`,
+  `UpsertUser`, `PermsDto`/`Permissions` (clearance_tier/can_see_pii/can_admin/
+  groups/member_count/is_default all aligned).
+- Body key `group_id` matches `AssignReq`; user ids URL-encoded for UPN `@`/spaces.
+
+### Gate criterion: `documentation_complete`
+This summary + committed Modeling/Architecture phase artifacts; endpoint mapping
+and decisions recorded above.
+
+### Verify commands re-run (from `admin-web/`, clean tree)
+| Command | Result |
+|---|---|
+| `npm ci` | ✅ |
+| `npm run lint` (`eslint .`) | ✅ exit 0, 0 errors |
+| `npx tsc --noEmit` | ✅ exit 0 |
+| `npm run test` (`vitest run`) | ✅ 9 files / 42 tests passed |
+| `npm run build` (`tsc -b && vite build`) | ✅ built (170 kB js / 13 kB css) |
+
+**Verdict: all three TrustValidation gate criteria met.**

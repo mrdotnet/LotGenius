@@ -599,3 +599,320 @@ body {
   color: var(--ink-faint);
   padding: 40px 4px;
 }
+
+/* ─── Tabs (admin section nav) ──────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin: 4px 0 8px;
+}
+.tab {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-dim);
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+}
+.tab:hover {
+  color: var(--ink);
+  background: var(--panel);
+}
+.tab--active {
+  color: var(--ink);
+  border-bottom-color: var(--ok);
+}
+.tab:focus-visible {
+  outline: 2px solid var(--suggest);
+  outline-offset: -2px;
+}
+
+.view {
+  padding-top: 6px;
+}
+.view-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 6px 0 2px;
+}
+.view-hint {
+  color: var(--ink-faint);
+  font-size: 13px;
+  margin: 0 4px 12px;
+}
+
+/* ─── Form fields shared by the admin views ─────────────────────────────── */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.field--sm {
+  max-width: 88px;
+}
+.field-label {
+  font-size: 12px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.field-input {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 14px;
+}
+.field-input:focus-visible {
+  outline: 2px solid var(--suggest);
+  outline-offset: -1px;
+}
+.btn--sm {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+/* ─── Source curation ───────────────────────────────────────────────────── */
+.sc-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.sc-arrow {
+  color: var(--suggest);
+  font-size: 20px;
+  padding-bottom: 8px;
+}
+
+/* ─── Tables (calibration, inventory, groups) ───────────────────────────── */
+.cal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.cal-table th,
+.cal-table td {
+  text-align: left;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.cal-table th {
+  color: var(--ink-faint);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.cal-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ─── Calibration ───────────────────────────────────────────────────────── */
+.cal-summary {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 8px 0 4px;
+}
+.cal-summary .stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 18px;
+  min-width: 120px;
+}
+.stat-num {
+  font-size: 22px;
+  font-weight: 700;
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.cal-histogram {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 180px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 14px 6px;
+}
+.cal-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+}
+.cal-bar-track {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+.cal-bar-fill {
+  width: 100%;
+  background: linear-gradient(var(--halo-soft), var(--halo));
+  border-radius: 4px 4px 0 0;
+  min-height: 2px;
+}
+.cal-bar-count {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+.cal-bar-label {
+  font-size: 10px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+/* ─── Users & groups ────────────────────────────────────────────────────── */
+.ug-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(240px, 1fr);
+  gap: 16px;
+}
+.ug-grid > .panel:last-child {
+  grid-column: 1 / -1;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.panel-title {
+  margin: 0 0 12px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-dim);
+}
+.panel-subtitle {
+  margin: 18px 0 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+.ug-users {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ug-user {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  color: var(--ink);
+}
+.ug-user:hover {
+  border-color: #3a4350;
+}
+.ug-user--active {
+  border-color: var(--ok);
+}
+.ug-user-name {
+  font-weight: 600;
+}
+.ug-user-id {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.ug-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.ug-chip {
+  background: rgba(61, 220, 132, 0.12);
+  border: 1px solid rgba(61, 220, 132, 0.4);
+  color: var(--ok);
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 11px;
+}
+.ug-chip--muted {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--ink-faint);
+}
+.ug-perms {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ug-perm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
+}
+.ug-perm-label {
+  color: var(--ink-faint);
+  font-size: 13px;
+}
+.ug-perm-val {
+  font-weight: 600;
+}
+.ug-membership {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ug-member-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.ug-new-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ug-flag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding-bottom: 8px;
+}

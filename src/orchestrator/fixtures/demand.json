@@ -1,0 +1,30 @@
+{
+  "_scenario": "Demand/competition (P2, zero PII): 'How competitive is the bidding on John Deere combines?'. Routes to structured_query template demand_metrics — AGGREGATE COUNTS ONLY, never bidder identity. Shapes satisfy structured_query + analyze output schemas.",
+  "structured_query": {
+    "rows": [
+      {
+        "n_lots": 38,
+        "total_bids": 412,
+        "distinct_bidders": 96,
+        "avg_bids_per_lot": 10.84,
+        "total_bid_requests": 57,
+        "distinct_watchers": 233
+      }
+    ],
+    "row_count": 1,
+    "filter_notes": "John Deere combines; bid/watch activity aggregated across 38 lots; no bidder identity"
+  },
+  "analyze": {
+    "answer": "Bidding on John Deere combines is competitive: 412 bids from 96 distinct bidders across 38 lots (about 11 bids per lot), with 233 watchers tracking them.",
+    "classification_receipt": {
+      "category_path": "agriculture > harvesting > combine",
+      "make_model_normalization": "John Deere combines (demand aggregate)",
+      "included": [{ "value": "combine", "reason": "demand metrics requested" }],
+      "excluded": [],
+      "confidence": 0.94,
+      "reasoningbank_hit": false
+    },
+    "citations": [],
+    "escalate": false
+  }
+}

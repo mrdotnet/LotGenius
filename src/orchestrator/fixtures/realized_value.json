@@ -1,0 +1,51 @@
+{
+  "_scenario": "Realized-value (P0, zero PII): 'What does a consignor actually net on a John Deere X9 combine after fees?'. Routes to structured_query template realized_value; analyze narrates and surfaces external-context corroboration SEPARATELY (Bridge Protocol). Shapes satisfy structured_query + analyze output schemas.",
+  "structured_query": {
+    "rows": [
+      {
+        "n": 38,
+        "net_to_consignor_avg": 498230.50,
+        "net_to_consignor_median": 487000.00,
+        "all_in_to_buyer_avg": 641120.00,
+        "all_in_to_buyer_median": 633500.00,
+        "hammer_avg": 561000.00,
+        "currency": "USD"
+      }
+    ],
+    "row_count": 1,
+    "filter_notes": "John Deere X9-class combines; 38 sold lots; true net after commission/expenses/outstanding"
+  },
+  "analyze": {
+    "answer": "Across 38 sold John Deere X9-class combines, here is the true realized economics after fees.",
+    "classification_receipt": {
+      "category_path": "agriculture > harvesting > combine",
+      "make_model_normalization": "John Deere X9 (class-level realized aggregate)",
+      "included": [{ "value": "X9 1100 / X9 1000", "reason": "X9-platform combines, sold lots only" }],
+      "excluded": [{ "value": "unsold / no-sale lots", "reason": "no hammer price" }],
+      "confidence": 0.95,
+      "reasoningbank_hit": true
+    },
+    "citations": [],
+    "context": [
+      {
+        "caption": "Used combine supply across the Northern Plains is running firmer than a year ago.",
+        "mechanism": "drought-driven herd liquidation lifts used-equipment turnover",
+        "region": "Northern Plains",
+        "period": "2024-Q3",
+        "n": 1840,
+        "window": "trailing 12 months",
+        "source": "MachineryPete"
+      },
+      {
+        "caption": "Sustained dry conditions continue to pull machinery onto the secondary market.",
+        "mechanism": "drought severity correlates with equipment de-stocking",
+        "region": "Northern Plains",
+        "period": "2024-Q3",
+        "n": 36,
+        "window": "rolling 3-month index",
+        "source": "noaa"
+      }
+    ],
+    "escalate": false
+  }
+}

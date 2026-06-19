@@ -68,19 +68,96 @@ def test_average_price_of_combines_extracts_category_param() -> None:
     assert call.arguments["params"].get("category") == "combine"
 
 
+# The full allowlist must mirror structured_query.schema.json's template enum.
+STRUCTURED_TEMPLATE_ALLOWLIST = {
+    "lots_by_ids",
+    "avg_price_by_category",
+    "price_trend_by_category",
+    "count_by_region",
+    "top_descriptions_by_performance",
+    "realized_value",
+    "realized_value_by_geo",
+    "demand_metrics",
+}
+
+
 def test_structured_template_is_allowlisted() -> None:
     """Router must only ever emit one of the schema's enum templates (no free SQL)."""
-    allowlist = {
-        "lots_by_ids",
-        "avg_price_by_category",
-        "price_trend_by_category",
-        "count_by_region",
-        "top_descriptions_by_performance",
-    }
     for query, _ in STRUCTURED_QUERIES:
         plan = route(query)
         (call,) = plan.tool_calls
-        assert call.arguments["template"] in allowlist
+        assert call.arguments["template"] in STRUCTURED_TEMPLATE_ALLOWLIST
+
+
+# --- Realized-value routes (P0): true net to consignor / all-in to buyer --------
+
+REALIZED_QUERIES = [
+    "What does a consignor actually net on a John Deere X9 combine after fees?",
+    "How much does the consignor take home on a combine?",
+    "What's the all-in cost to the buyer for an X9 1100?",
+    "What do consignors net after commission on tractors?",
+    "Realized value of a 2023 John Deere combine?",
+]
+
+
+@pytest.mark.parametrize("query", REALIZED_QUERIES)
+def test_realized_value_queries_route_to_realized_template(query: str) -> None:
+    plan = route(query)
+    assert plan.intent == Intent.REALIZED_VALUE, plan.rationale
+    assert plan.tools == ["structured_query"]
+    (call,) = plan.tool_calls
+    assert call.arguments["template"] == "realized_value"
+
+
+def test_realized_value_by_geo_when_grain_present() -> None:
+    plan = route("What do consignors net on John Deere combines by state?")
+    assert plan.intent == Intent.REALIZED_VALUE
+    (call,) = plan.tool_calls
+    assert call.arguments["template"] == "realized_value_by_geo"
+    assert call.arguments["params"]["group_by"] == "state"
+
+
+def test_realized_value_extracts_make_and_category() -> None:
+    plan = route("What does a consignor net on a John Deere combine after fees?")
+    (call,) = plan.tool_calls
+    assert call.arguments["params"].get("make") == "john deere"
+    assert call.arguments["params"].get("category") == "combine"
+
+
+def test_realized_value_extracts_year_band() -> None:
+    plan = route("Realized value of a 2023 John Deere combine after fees?")
+    (call,) = plan.tool_calls
+    params = call.arguments["params"]
+    assert params["year_min"] == 2023
+    assert params["year_max"] == 2023
+
+
+# --- Demand / competition routes (P2): aggregate counts only --------------------
+
+DEMAND_QUERIES = [
+    "How competitive is the bidding on John Deere combines?",
+    "How many bidders did the X9 combines draw?",
+    "What's the demand for tractors right now?",
+    "How many watchers do combines get?",
+]
+
+
+@pytest.mark.parametrize("query", DEMAND_QUERIES)
+def test_demand_queries_route_to_demand_metrics(query: str) -> None:
+    plan = route(query)
+    assert plan.intent == Intent.DEMAND, plan.rationale
+    assert plan.tools == ["structured_query"]
+    (call,) = plan.tool_calls
+    assert call.arguments["template"] == "demand_metrics"
+
+
+def test_realized_value_wins_over_generic_structured_signal() -> None:
+    """A realized-value ask that also trips a generic aggregate word stays realized."""
+    # "average" is a structured signal, but "net ... after fees" is realized.
+    plan = route("What's the average net to the consignor after fees on combines?")
+    assert plan.intent == Intent.REALIZED_VALUE
+    (call,) = plan.tool_calls
+    assert call.arguments["template"] == "realized_value"
 
 
 # --- Mixed routes: both tools -------------------------------------------------

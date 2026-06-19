@@ -24,7 +24,7 @@ from typing import Any
 
 from .identity import CallerIdentity
 from .mcp_client import MCPClient
-from .router import Intent, RoutePlan, route
+from .router import AGGREGATE_INTENTS, Intent, RoutePlan, route
 
 
 @dataclass
@@ -44,6 +44,17 @@ class Answer:
                      ``can_see_pii`` (Item 3), so this carries the headline PII
                      differential straight through to the answer. ``None`` when
                      the analyze result carried no consignor field.
+        realized_value: Optional realized-value aggregate (P0) — the true net to
+                     the consignor and all-in cost to the buyer, from the
+                     ``realized_value`` structured_query template. Trusted
+                     numbers (zero PII). ``None`` unless the intent is
+                     REALIZED_VALUE and the template returned a row.
+        context_notes: External-context corroboration (P2, Bridge Protocol),
+                     surfaced from ``analyze.context`` and narrated SEPARATELY
+                     from the trusted numbers. Each note is qualitative/
+                     directional and carries provenance (mechanism + source +
+                     (region, period) + n + window); it never carries a
+                     standalone fabricated valuation number.
     """
 
     text: str
@@ -53,6 +64,8 @@ class Answer:
     receipt: dict[str, Any] = field(default_factory=dict)
     tool_calls: list[str] = field(default_factory=list)
     consignor: dict[str, Any] | None = None
+    realized_value: dict[str, Any] | None = None
+    context_notes: list[dict[str, Any]] = field(default_factory=list)
 
 
 # Surfaced verbatim when analyze escalates. Carries the "confident refusal beats
@@ -151,6 +164,23 @@ class Orchestrator:
 
         text = analysis.get("answer") or ""
         text = self._format_answer(text, citations, plan.intent)
+
+        # P0 realized-value: surface the true net-to-consignor / all-in-to-buyer
+        # aggregate beside the answer. The figures are the trusted numbers from
+        # the realized_value template (facts[0]); we format them deterministically
+        # rather than trusting narration to restate them.
+        realized_value: dict[str, Any] | None = None
+        if plan.intent == Intent.REALIZED_VALUE and facts:
+            realized_value = facts[0]
+            text = self._append_realized_value(text, realized_value)
+
+        # P2 external context: narrate SEPARATELY from the trusted numbers. The
+        # seam fuses it onto analyze.context (Bridge Protocol); each note carries
+        # provenance and never a standalone valuation number.
+        context_notes = [n for n in (analysis.get("context") or []) if isinstance(n, dict)]
+        if context_notes:
+            text = self._append_context(text, context_notes)
+
         return Answer(
             text=text,
             escalated=False,
@@ -159,6 +189,8 @@ class Orchestrator:
             receipt=receipt,
             tool_calls=plan.tools,
             consignor=consignor,
+            realized_value=realized_value,
+            context_notes=context_notes,
         )
 
     @staticmethod
@@ -189,10 +221,10 @@ class Orchestrator:
             cite_str = ", ".join(f"Lot {lot_id}" for lot_id in citations)
             return f"{answer_text}\n\nSources: {cite_str}.".strip()
 
-        # No lot-level citations. For an aggregate (structured) answer this is
-        # expected and correct — provenance is the SQL aggregate, not a lot_id —
-        # so we pass the answer through untouched.
-        if intent == Intent.STRUCTURED:
+        # No lot-level citations. For an aggregate answer (structured / realized-
+        # value / demand) this is expected and correct — provenance is the SQL
+        # aggregate over n lots, not a lot_id — so we pass it through untouched.
+        if intent in AGGREGATE_INTENTS:
             return answer_text.strip()
 
         # Genuine orphan: a comps-style answer with a figure but no citation.
@@ -201,3 +233,74 @@ class Orchestrator:
             "(No Lot-ID citations were returned for this answer — treat any "
             "figures as unverified.)"
         ).strip()
+
+    @staticmethod
+    def _money(value: Any) -> str | None:
+        """Format a money value as ~$NNN,NNN; None when not a finite number."""
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            return None
+        return f"~${value:,.0f}"
+
+    @classmethod
+    def _append_realized_value(cls, text: str, row: dict[str, Any]) -> str:
+        """Append the deterministic realized-value line (P0) to the answer.
+
+        Surfaces the trusted numbers from the realized_value template:
+        "Realized value: consignor netted ~$Y on average (median ~$Ymed); buyer
+        paid ~$Z all-in (n=NN)." Only the fields actually present are rendered —
+        we never invent a figure the template did not return.
+        """
+        net_avg = cls._money(row.get("net_to_consignor_avg"))
+        net_med = cls._money(row.get("net_to_consignor_median"))
+        buyer_avg = cls._money(row.get("all_in_to_buyer_avg"))
+        n = row.get("n")
+
+        if net_avg is None and buyer_avg is None:
+            return text  # nothing trustworthy to surface
+
+        parts: list[str] = []
+        if net_avg is not None:
+            consignor_part = f"consignor netted {net_avg} on average"
+            if net_med is not None:
+                consignor_part += f" (median {net_med})"
+            parts.append(consignor_part)
+        if buyer_avg is not None:
+            parts.append(f"buyer paid {buyer_avg} all-in")
+
+        line = "Realized value: " + "; ".join(parts)
+        if isinstance(n, int):
+            line += f" (n={n})"
+        line += "."
+        return f"{text}\n\n{line}".strip()
+
+    @staticmethod
+    def _append_context(text: str, notes: list[dict[str, Any]]) -> str:
+        """Append external-context corroboration, narrated SEPARATELY (P2).
+
+        Renders a clearly-labelled block so context is never mistaken for a
+        trusted number. Each note shows its caption + named mechanism + source +
+        (region, period) + n/window provenance. Notes missing a mechanism or a
+        source are dropped here too (provenance-or-no-render), defense in depth
+        on top of the seam's own enforcement.
+        """
+        lines: list[str] = ["Context (corroboration only — not a valuation):"]
+        rendered = 0
+        for note in notes:
+            caption = (note.get("caption") or "").strip()
+            mechanism = (note.get("mechanism") or "").strip()
+            source = (note.get("source") or "").strip()
+            if not caption or not mechanism or not source:
+                continue  # provenance-or-no-render
+            prov: list[str] = [f"mechanism: {mechanism}"]
+            region, period = note.get("region"), note.get("period")
+            if region and period:
+                prov.append(f"{region}, {period}")
+            n, window = note.get("n"), note.get("window")
+            if isinstance(n, int) and window:
+                prov.append(f"n={n}, {window}")
+            prov.append(f"source: {source}")
+            lines.append(f"- {caption} ({'; '.join(prov)})")
+            rendered += 1
+        if rendered == 0:
+            return text
+        return f"{text}\n\n" + "\n".join(lines)

@@ -25,12 +25,29 @@ from typing import Any
 
 
 class Intent(str, Enum):
-    """The three routing outcomes plus a degenerate empty case."""
+    """The routing outcomes.
+
+    COMPS / STRUCTURED / BOTH are the original PRD §5.2 three-way decision.
+    REALIZED_VALUE and DEMAND are P0/P2 specializations of the structured path:
+    they still call ``structured_query`` (trusted numbers), but the orchestrator
+    surfaces them differently — REALIZED_VALUE narrates a "consignor netted ~$Y,
+    buyer paid ~$Z all-in (n=…)" line; DEMAND narrates aggregate bid/watch counts.
+    """
 
     COMPS = "comps"
     STRUCTURED = "structured"
     BOTH = "both"
+    REALIZED_VALUE = "realized_value"
+    DEMAND = "demand"
     NONE = "none"
+
+
+# Intents whose answer is an aggregate over many lots (provenance is n + filter,
+# not a per-lot citation), so the formatter must NOT attach the orphan-number
+# "unverified" footer to them.
+AGGREGATE_INTENTS = frozenset(
+    {Intent.STRUCTURED, Intent.REALIZED_VALUE, Intent.DEMAND}
+)
 
 
 @dataclass(frozen=True)
@@ -100,12 +117,69 @@ _COMPS_SIGNALS = re.compile(
 )
 
 
+# Realized-value language -> realized_value template (P0). True net to consignor /
+# all-in cost to buyer, after fees. More specific than generic structured signals,
+# so it is checked FIRST.
+_REALIZED_SIGNALS = re.compile(
+    r"""
+    \b(
+        net | nets | netted | net\s+proceeds | net\s+to\s+(the\s+)?consignor |
+        take[\s-]?home | walk\s+away\s+with | clear\s+after |
+        after\s+(fees|commission|commissions|expenses|costs) |
+        all[\s-]?in | total\s+cost\s+to\s+(the\s+)?buyer |
+        realized\s+(price|value|net|proceeds) |
+        actually\s+(net|nets|clear|clears|keep|keeps|get|gets|pay|pays|paid|make|makes) |
+        consignor .* (net|nets|receive|receives|get|gets|clear|clears) |
+        (net|nets|take[\s-]?home) .* consignor
+    )\b
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+# Demand / competition language -> demand_metrics template (P2). Aggregate
+# bid/watch counts only (never bidder identity).
+_DEMAND_SIGNALS = re.compile(
+    r"""
+    \b(
+        how\s+many\s+(bid|bids|bidders|watchers) |
+        number\s+of\s+(bid|bids|bidders|watchers) |
+        bid(ding)?\s+activity | bid\s+count | bidder\s+count | bid\s+depth |
+        how\s+competitive | competition | competitive\s+(was|is) |
+        demand\s+for | demand\b | watchers? | watch(ed|list) |
+        how\s+much\s+interest | interest\s+in
+    )\b
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+# "by state / by county" -> geo rollup grain for realized_value_by_geo.
+_GEO_GRAIN_SIGNALS = re.compile(
+    r"\bby\s+(state|county)|per\s+(state|county)\b", re.IGNORECASE
+)
+
+
 def _has_structured(query: str) -> bool:
     return bool(_STRUCTURED_SIGNALS.search(query))
 
 
 def _has_comps(query: str) -> bool:
     return bool(_COMPS_SIGNALS.search(query))
+
+
+def _has_realized(query: str) -> bool:
+    return bool(_REALIZED_SIGNALS.search(query))
+
+
+def _has_demand(query: str) -> bool:
+    return bool(_DEMAND_SIGNALS.search(query))
+
+
+def _geo_grain(query: str) -> str | None:
+    """Return 'state'/'county' if the query asks for a geo rollup, else None."""
+    m = _GEO_GRAIN_SIGNALS.search(query)
+    if not m:
+        return None
+    return (m.group(1) or m.group(2) or "").lower() or None
 
 
 def _build_comps_call(query: str, top_k: int, min_similarity: float) -> ToolCall:
@@ -170,6 +244,54 @@ def _extract_category(query: str) -> str | None:
     return None
 
 
+# Common equipment makes, for cheap param extraction in the offline harness (the
+# live agent extracts these via the model). Normalized to the make_norm form.
+_KNOWN_MAKES = [
+    "john deere",
+    "case ih",
+    "case",
+    "new holland",
+    "kinze",
+    "bobcat",
+    "kubota",
+    "caterpillar",
+    "claas",
+    "fendt",
+    "massey ferguson",
+    "vermeer",
+]
+
+
+def _extract_make(query: str) -> str | None:
+    q = query.lower()
+    # Longest match first so "case ih" wins over "case".
+    for make in sorted(_KNOWN_MAKES, key=len, reverse=True):
+        if re.search(rf"\b{re.escape(make)}\b", q):
+            return make
+    return None
+
+
+def _extract_year_band(query: str) -> dict[str, int]:
+    """Extract a model-year band. A single 4-digit year sets year_min==year_max."""
+    years = [int(y) for y in re.findall(r"\b(?:19|20)\d{2}\b", query)]
+    if not years:
+        return {}
+    return {"year_min": min(years), "year_max": max(years)}
+
+
+def _extract_filters(query: str) -> dict[str, Any]:
+    """Shared filter extraction for the aggregate templates (category/make/year)."""
+    params: dict[str, Any] = {}
+    category = _extract_category(query)
+    if category:
+        params["category"] = category
+    make = _extract_make(query)
+    if make:
+        params["make"] = make
+    params.update(_extract_year_band(query))
+    return params
+
+
 def _build_structured_call(query: str) -> ToolCall:
     """Construct a structured_query call bound to structured_query.schema.json."""
     template = _structured_template_for(query)
@@ -181,6 +303,33 @@ def _build_structured_call(query: str) -> ToolCall:
     if region_match and "region" not in params:
         params["region"] = region_match.group(1)
     return ToolCall(tool="structured_query", arguments={"template": template, "params": params})
+
+
+def _build_realized_call(query: str) -> ToolCall:
+    """Construct a realized_value (or realized_value_by_geo) structured_query call.
+
+    Uses the trusted-numbers tool with the realized-value template — see
+    Docs/specs/realized-value-template.md and geo-rollups-template.md.
+    """
+    params = _extract_filters(query)
+    grain = _geo_grain(query)
+    if grain:
+        params["group_by"] = grain
+        template = "realized_value_by_geo"
+    else:
+        template = "realized_value"
+    return ToolCall(tool="structured_query", arguments={"template": template, "params": params})
+
+
+def _build_demand_call(query: str) -> ToolCall:
+    """Construct a demand_metrics structured_query call (aggregate counts only).
+
+    See Docs/specs/demand-competition-template.md — NEVER bidder identity.
+    """
+    params = _extract_filters(query)
+    return ToolCall(
+        tool="structured_query", arguments={"template": "demand_metrics", "params": params}
+    )
 
 
 def route(
@@ -210,6 +359,27 @@ def route(
     """
     if not query or not query.strip():
         return RoutePlan(intent=Intent.NONE, tool_calls=[], rationale="empty query")
+
+    # P0/P2 specializations are checked BEFORE the generic comps/structured split:
+    # realized-value and demand language is more specific (a realized-value ask
+    # like "what does a consignor net... after fees" also trips generic structured
+    # signals, so it must win first).
+    if _has_realized(query):
+        grain = _geo_grain(query)
+        return RoutePlan(
+            intent=Intent.REALIZED_VALUE,
+            tool_calls=[_build_realized_call(query)],
+            rationale=(
+                "realized-value language -> structured_query realized_value"
+                + ("_by_geo" if grain else "")
+            ),
+        )
+    if _has_demand(query):
+        return RoutePlan(
+            intent=Intent.DEMAND,
+            tool_calls=[_build_demand_call(query)],
+            rationale="demand/competition language -> demand_metrics (aggregate counts only)",
+        )
 
     has_comps = _has_comps(query)
     has_structured = _has_structured(query)

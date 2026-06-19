@@ -201,3 +201,114 @@ def test_format_answer_appends_sources_when_citations_present() -> None:
     text = O._format_answer("Sold for $585,000.", [4412, 4380], Intent.COMPS)
     assert "Sources: Lot 4412, Lot 4380." in text
     assert "unverified" not in text
+
+
+# --- P0 realized-value surfacing ---------------------------------------------
+
+
+def test_realized_value_surfaces_net_and_all_in() -> None:
+    """P0 headline: a realized-value ask returns the net-to-consignor + all-in-to-buyer line."""
+    result = _orch().answer(
+        "What does a consignor actually net on a John Deere X9 combine after fees?",
+        scenario="realized_value",
+    )
+    assert result.escalated is False
+    assert result.intent == Intent.REALIZED_VALUE
+    assert result.tool_calls == ["structured_query"]
+    # The trusted realized aggregate is surfaced as a structured block.
+    assert result.realized_value is not None
+    assert result.realized_value["net_to_consignor_avg"] == 498230.50
+    # The deterministic realized-value line carries both perspectives + n.
+    assert "consignor netted ~$498,230" in result.text
+    assert "buyer paid ~$641,120 all-in" in result.text
+    assert "n=38" in result.text
+    # Aggregate provenance -> no orphan-number "unverified" footer.
+    assert "unverified" not in result.text
+
+
+def test_realized_value_line_is_deterministic_not_from_narration() -> None:
+    """The figures come from the trusted template row, not from analyze prose."""
+    from lotgenius_orchestrator.orchestrator import Orchestrator as O
+
+    row = {
+        "n": 12,
+        "net_to_consignor_avg": 100000,
+        "net_to_consignor_median": 95000,
+        "all_in_to_buyer_avg": 130000,
+    }
+    text = O._append_realized_value("base.", row)
+    assert "consignor netted ~$100,000 on average (median ~$95,000)" in text
+    assert "buyer paid ~$130,000 all-in" in text
+    assert "(n=12)" in text
+
+
+def test_realized_value_omits_missing_figures() -> None:
+    """We never invent a perspective the template did not return."""
+    from lotgenius_orchestrator.orchestrator import Orchestrator as O
+
+    text = O._append_realized_value("base.", {"n": 5, "net_to_consignor_avg": 50000})
+    assert "consignor netted ~$50,000" in text
+    assert "all-in" not in text  # buyer figure absent -> not fabricated
+
+
+# --- P2 external-context narration (Bridge Protocol) -------------------------
+
+
+def test_external_context_narrated_separately_with_provenance() -> None:
+    """Context corroborates SEPARATELY from the trusted numbers, with provenance."""
+    result = _orch().answer(
+        "What does a consignor net on a John Deere X9 combine after fees?",
+        scenario="realized_value",
+    )
+    assert len(result.context_notes) == 2
+    # Each note carries the Bridge Protocol provenance.
+    for note in result.context_notes:
+        assert note["mechanism"]
+        assert note["source"] in {"MachineryPete", "noaa", "crop_insurance", "ffiec"}
+        assert note["region"] and note["period"]
+    # Narrated under a clearly-separated, non-valuation heading.
+    assert "Context (corroboration only — not a valuation):" in result.text
+    assert "drought-driven herd liquidation" in result.text
+    assert "source: MachineryPete" in result.text
+
+
+def test_external_context_carries_no_standalone_valuation_number() -> None:
+    """Bridge Protocol hard rule: context captions never assert a dollar figure."""
+    result = _orch().answer(
+        "What does a consignor net on a John Deere X9 combine after fees?",
+        scenario="realized_value",
+    )
+    # Pull just the context block and assert no '$' figure leaked into a caption.
+    context_block = result.text.split("Context (corroboration only")[1]
+    for note in result.context_notes:
+        assert "$" not in note["caption"]
+    # The only dollar figures in the whole answer are the trusted realized ones.
+    assert "$" in result.text  # realized line has them
+    assert context_block.count("$") == 0
+
+
+def test_append_context_drops_notes_missing_provenance() -> None:
+    """provenance-or-no-render: a note without mechanism/source is not rendered."""
+    from lotgenius_orchestrator.orchestrator import Orchestrator as O
+
+    notes = [
+        {"caption": "good note", "mechanism": "m", "source": "noaa"},
+        {"caption": "no mechanism", "source": "noaa"},
+        {"caption": "no source", "mechanism": "m"},
+    ]
+    text = O._append_context("base.", notes)
+    assert "good note" in text
+    assert "no mechanism" not in text
+    assert "no source" not in text
+
+
+def test_demand_metrics_surfaces_aggregate_counts() -> None:
+    """P2 demand: aggregate bid/watch counts answered as trusted numbers, no PII."""
+    result = _orch().answer(
+        "How competitive is the bidding on John Deere combines?", scenario="demand"
+    )
+    assert result.escalated is False
+    assert result.intent == Intent.DEMAND
+    assert result.tool_calls == ["structured_query"]
+    assert "96 distinct bidders" in result.text
+    assert "unverified" not in result.text  # aggregate provenance

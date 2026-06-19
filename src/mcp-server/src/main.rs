@@ -16,6 +16,7 @@
 //!     cargo run
 
 mod contracts;
+mod identity;
 mod runtime;
 
 use std::borrow::Cow;
@@ -99,7 +100,7 @@ impl ServerHandler for LotGeniusServer {
     async fn call_tool(
         &self,
         request: CallToolRequestParams,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, McpError> {
         let name = request.name.as_ref();
 
@@ -111,8 +112,21 @@ impl ServerHandler for LotGeniusServer {
             ));
         }
 
-        // Arguments object → serde_json::Value (default to {}), as the runtime expects.
-        let args = serde_json::Value::Object(request.arguments.unwrap_or_default());
+        // Resolve the caller OUT OF BAND from the transport (HTTP headers / env), strip any
+        // client-supplied reserved key, and inject the verified `_caller` envelope. The
+        // model cannot read or forge it; the runtime resolves it to ABAC permissions and
+        // enforces row/field visibility behind the boundary (PRD §8.1). See `identity`.
+        let caller = identity::extract(&context);
+        tracing::debug!(
+            tool = name,
+            caller_source = caller.source,
+            anonymous = caller.is_anonymous(),
+            "delegating with resolved caller identity"
+        );
+        let args = serde_json::Value::Object(identity::inject(
+            request.arguments.unwrap_or_default(),
+            &caller,
+        ));
 
         // Resolve the Background-IP runtime and delegate. No tool logic lives here.
         let rt = runtime::connect().map_err(|e| McpError::internal_error(e.to_string(), None))?;

@@ -29,6 +29,10 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std", "net
 # Azure Container App, reached by Foundry over managed identity (PRD §5.1/§8.1). The scaffold
 # default stays stdio; HTTP is selected at runtime (env LOTGENIUS_HTTP_ADDR / --http).
 axum = "0.8"
+# Caller-identity carriage: rmcp injects `http::request::Parts` into the request
+# extensions on the streamable-HTTP transport; the seam reads the front-door caller
+# headers from it (src/identity.rs). `1` unifies with rmcp's own `http` 1.x.
+http = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"

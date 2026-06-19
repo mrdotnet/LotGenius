@@ -31,6 +31,23 @@
         }
       },
       "citations": { "type": "array", "items": { "type": "integer" }, "description": "Lot IDs backing every number stated." },
+      "context": {
+        "type": "array",
+        "description": "OPTIONAL external-context corroboration, fused from the external-context envelope (Docs/specs/external-context-envelope.md, Bridge Protocol). NARRATED SEPARATELY from trusted numbers — context NEVER carries a standalone fabricated valuation number. Each note is qualitative/directional and MUST be keyed on (region, period) and carry a named mechanism + n + window + source, or it is dropped (provenance-or-no-render).",
+        "items": {
+          "type": "object",
+          "properties": {
+            "caption": { "type": "string", "description": "Directional, qualitative corroboration sentence — no standalone valuation number." },
+            "mechanism": { "type": "string", "description": "Named causal mechanism, e.g. 'drought-driven herd liquidation lifts used-equipment supply'." },
+            "region": { "type": "string" },
+            "period": { "type": "string", "description": "The (time) key, e.g. '2024-Q3' or '2024'." },
+            "n": { "type": "integer", "description": "Sample size behind the corroboration." },
+            "window": { "type": "string", "description": "Observation window, e.g. 'trailing 12 months'." },
+            "source": { "type": "string", "description": "Named source: MachineryPete | noaa | crop_insurance | ffiec." }
+          },
+          "required": ["caption", "mechanism", "source"]
+        }
+      },
       "escalate": { "type": "boolean", "description": "True when below the confidence floor — caller must defer to a human, not fabricate." }
     },
     "required": ["classification_receipt", "escalate"]

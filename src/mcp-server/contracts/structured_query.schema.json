@@ -1,28 +1,38 @@
 {
   "name": "structured_query",
   "title": "Structured aggregate query (parameterized)",
-  "description": "Run a PARAMETERIZED, allowlisted query template against Synapse Serverless for exact aggregates, trends, counts, and geography filters — or to fetch authoritative price/date/region for a set of lot_ids returned by comps_search. NEVER generates free-form SQL. Every number returned is authoritative and traceable to a Lot ID.",
+  "description": "Run a PARAMETERIZED, allowlisted query template against Synapse Serverless for exact aggregates, trends, counts, geography rollups, realized-value (true net) economics, and demand/competition metrics — or to fetch authoritative price/date/region for a set of lot_ids returned by comps_search. NEVER generates free-form SQL. Every number returned is authoritative and traceable to a Lot ID or a named aggregate over Lot IDs. Realized-value and geo templates compute TRUE net economics from in-Lot money fields only (zero PII). Demand templates return AGGREGATE COUNTS ONLY — never bidder identity.",
   "inputSchema": {
     "type": "object",
     "properties": {
       "template": {
         "type": "string",
-        "description": "Allowlisted template name.",
+        "description": "Allowlisted template name. realized_value / realized_value_by_geo compute true net-to-consignor and all-in-to-buyer from in-Lot money fields (see Docs/specs/realized-value-template.md, geo-rollups-template.md). demand_metrics returns aggregate bid/watch counts with NO bidder identity (see Docs/specs/demand-competition-template.md).",
         "enum": [
           "lots_by_ids",
           "avg_price_by_category",
           "price_trend_by_category",
           "count_by_region",
-          "top_descriptions_by_performance"
+          "top_descriptions_by_performance",
+          "realized_value",
+          "realized_value_by_geo",
+          "demand_metrics"
         ]
       },
       "params": {
         "type": "object",
-        "description": "Template-specific parameters (validated server-side).",
+        "description": "Template-specific parameters (validated server-side). category/make/model/region/state/county/year_min/year_max filter the lot population; group_by selects the geo rollup grain for realized_value_by_geo.",
         "properties": {
           "lot_ids": { "type": "array", "items": { "type": "integer" } },
           "category": { "type": "string" },
+          "make": { "type": "string", "description": "Normalized make filter, e.g. 'john deere'." },
+          "model": { "type": "string", "description": "Normalized model filter, e.g. 'x9 1100'." },
           "region": { "type": "string" },
+          "state": { "type": "string", "description": "In-Lot address state (2-letter or name), e.g. 'ND'." },
+          "county": { "type": "string", "description": "In-Lot address county." },
+          "group_by": { "type": "string", "enum": ["state", "county"], "description": "Geo rollup grain for realized_value_by_geo." },
+          "year_min": { "type": "integer" },
+          "year_max": { "type": "integer" },
           "date_from": { "type": "string", "format": "date" },
           "date_to": { "type": "string", "format": "date" }
         },

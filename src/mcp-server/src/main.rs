@@ -112,17 +112,41 @@ impl ServerHandler for LotGeniusServer {
             ));
         }
 
-        // Resolve the caller OUT OF BAND from the transport (HTTP headers / env), strip any
-        // client-supplied reserved key, and inject the verified `_caller` envelope. The
-        // model cannot read or forge it; the runtime resolves it to ABAC permissions and
-        // enforces row/field visibility behind the boundary (PRD §8.1). See `identity`.
+        // Resolve the caller OUT OF BAND from the transport (HTTP headers / env). G2:
+        // inbound caller headers are honored ONLY for the proven front door; a forged
+        // header from an untrusted peer is stripped and resolves to anonymous. See
+        // `identity::extract` / `identity::front_door_trusted`.
         let caller = identity::extract(&context);
+        let pii_live = identity::pii_live();
         tracing::debug!(
             tool = name,
             caller_source = caller.source,
             anonymous = caller.is_anonymous(),
-            "delegating with resolved caller identity"
+            pii_live,
+            "resolved caller identity for delegation"
         );
+
+        // G3 — fail-CLOSED: under PII_LIVE, an anonymous/unresolved caller is REFUSED on
+        // PII-bearing tools rather than silently dropping to `basic`. The runtime is never
+        // reached. With PII_LIVE unset this is a no-op (today's demo behavior preserved).
+        if identity::refuse_anonymous(name, &caller, pii_live) {
+            tracing::warn!(
+                tool = name,
+                caller_source = caller.source,
+                "fail-closed: refusing anonymous caller on PII-bearing tool (PII_LIVE)"
+            );
+            let mut refusal = CallToolResult::error(vec![Content::text(format!(
+                "refused: `{name}` requires a verified caller identity. PII_LIVE fail-closed \
+                 denies PII-bearing tools to anonymous/unresolved callers at the seam."
+            ))]);
+            // G7 — the denial is auditable too.
+            refusal.meta = Some(identity::audit_meta(&caller, true));
+            return Ok(refusal);
+        }
+
+        // Strip any client-supplied reserved key and inject the verified `_caller`
+        // envelope. The model cannot read or forge it; the runtime resolves it to ABAC
+        // permissions and enforces row/field visibility behind the boundary (PRD §8.1).
         let args = serde_json::Value::Object(identity::inject(
             request.arguments.unwrap_or_default(),
             &caller,
@@ -148,7 +172,11 @@ impl ServerHandler for LotGeniusServer {
 
         let text = serde_json::to_string(&result)
             .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-        Ok(CallToolResult::success(vec![Content::text(text)]))
+        // G7 — attach the audit envelope (caller oid+source + redaction-list slot the
+        // runtime fills) to every response `_meta` so the call is attributable.
+        let mut ok = CallToolResult::success(vec![Content::text(text)]);
+        ok.meta = Some(identity::audit_meta(&caller, false));
+        Ok(ok)
     }
 }
 

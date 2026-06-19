@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+*.tsbuildinfo
+*.local
+# .env is committed: it contains no secrets, only the fixture-mode default that
+# makes the explorer demoable standalone. Ignore local overrides only.
+.env.local
+.env.*.local
+.DS_Store
+*.log

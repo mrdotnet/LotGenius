@@ -22,6 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .identity import CallerIdentity
 from .mcp_client import MCPClient
 from .router import Intent, RoutePlan, route
 
@@ -38,6 +39,11 @@ class Answer:
         intent:      The routing decision that produced this answer.
         receipt:     The classification receipt from ``analyze`` (auditable).
         tool_calls:  Names of the retrieval tools actually dispatched.
+        consignor:   Optional consignor block from ``analyze``. PII — the seam
+                     redacts every leaf to ``[REDACTED]`` for a caller without
+                     ``can_see_pii`` (Item 3), so this carries the headline PII
+                     differential straight through to the answer. ``None`` when
+                     the analyze result carried no consignor field.
     """
 
     text: str
@@ -46,6 +52,7 @@ class Answer:
     intent: Intent = Intent.NONE
     receipt: dict[str, Any] = field(default_factory=dict)
     tool_calls: list[str] = field(default_factory=list)
+    consignor: dict[str, Any] | None = None
 
 
 # Surfaced verbatim when analyze escalates. Carries the "confident refusal beats
@@ -69,8 +76,9 @@ class Orchestrator:
         top_k: int = 5,
         min_similarity: float = 0.0,
         scenario: str | None = None,
+        caller: CallerIdentity | None = None,
     ) -> Answer:
-        """Run the full local agent loop for ``query``.
+        """Run the full local agent loop for ``query`` on behalf of ``caller``.
 
         Args:
             query: The appraiser's natural-language question.
@@ -78,6 +86,10 @@ class Orchestrator:
             min_similarity: comps_search confidence floor.
             scenario: For MockMCPClient — which fixture scenario to answer from.
                       Ignored by live clients.
+            caller: The signed-in user the query is asked for. Threaded onto
+                    EVERY MCP call so the seam resolves ABAC permissions and
+                    enforces the field-level PII gate (Item 3/4). ``None`` ==
+                    anonymous (the seam applies the default ``basic`` group).
 
         Returns:
             An Answer carrying the analyze decision (escalate + citations) and a
@@ -94,7 +106,7 @@ class Orchestrator:
 
         # 1. Dispatch the retrieval tools the router chose.
         for call in plan.tool_calls:
-            result = self.mcp.call_tool(call.tool, call.arguments)
+            result = self.mcp.call_tool(call.tool, call.arguments, caller=caller)
             if call.tool == "comps_search":
                 comps = result.get("comps", [])
                 # If the seam flagged low confidence, we still hand it to
@@ -116,11 +128,15 @@ class Orchestrator:
             analyze_args["comps"] = comps
         if facts:
             analyze_args["facts"] = facts
-        analysis = self.mcp.call_tool("analyze", analyze_args)
+        analysis = self.mcp.call_tool("analyze", analyze_args, caller=caller)
 
         escalate = bool(analysis.get("escalate", False))
         receipt = analysis.get("classification_receipt", {})
         citations = list(analysis.get("citations", []) or [])
+        # Consignor PII rides through verbatim. The seam already redacted it to
+        # [REDACTED] unless the caller can_see_pii (Item 3) — we never re-derive
+        # the policy here, we only carry whatever the boundary chose to release.
+        consignor = analysis.get("consignor")
 
         # 3. Format — refusal surfaces as "no good comps", never a number.
         if escalate:
@@ -142,6 +158,7 @@ class Orchestrator:
             intent=plan.intent,
             receipt=receipt,
             tool_calls=plan.tools,
+            consignor=consignor,
         )
 
     @staticmethod

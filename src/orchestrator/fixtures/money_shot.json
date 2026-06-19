@@ -35,6 +35,12 @@
       "reasoningbank_hit": true
     },
     "citations": [4412, 4380, 4501, 4290, 4188],
+    "consignor": {
+      "lot_id": 4290,
+      "consignor_name": "Dale Branton",
+      "consignor_phone": "701-555-0142",
+      "consignor_email": "dale.branton@example.com"
+    },
     "escalate": false
   }
 }

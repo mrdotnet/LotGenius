@@ -41,3 +41,11 @@ crash.*.log
 # CLIENT-CONFIDENTIAL — Steffes Azure security assessment (live-tenant findings:
 # resource names, public IPs, privileged principal GUIDs). NEVER commit/push.
 Docs/steffes-az-security-assessment.*
+
+# Local sptflo orchestration (dev tooling; not a deliverable)
+.mcp.json
+
+# Python build/cache artifacts (must never be tracked)
+__pycache__/
+*.py[cod]
+*.egg-info/

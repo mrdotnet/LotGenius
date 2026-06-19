@@ -177,10 +177,12 @@ export function createMockApi(): AdminApi {
       return {
         affected_lot_count: matched.length,
         affected_lot_ids: matched.map((s) => s.lot_id),
+        // Mirror the shim's RuleDto (src/admin-shim/src/api.rs).
         rule: {
-          type: "alias_override",
-          from: req.alias ?? "(selection)",
-          to: req.target_category,
+          rule_type: req.alias != null ? "alias" : "lot_ids",
+          alias: req.alias ?? null,
+          target_category: req.target_category,
+          scope: "category",
           lot_ids: req.lot_ids ?? matched.map((s) => s.lot_id),
         },
       };
@@ -207,10 +209,12 @@ export function createMockApi(): AdminApi {
       return {
         reversible_handle: handle,
         affected_lot_count: matched.length,
+        // Mirror the shim's RuleDto (src/admin-shim/src/api.rs).
         rule: {
-          type: "alias_override",
-          from: req.alias ?? "(selection)",
-          to: req.target_category,
+          rule_type: req.alias != null ? "alias" : "lot_ids",
+          alias: req.alias ?? null,
+          target_category: req.target_category,
+          scope: "category",
           lot_ids: [...ids],
         },
       };
@@ -323,9 +327,15 @@ export function createMockApi(): AdminApi {
     async resolvePermissions(userId: string): Promise<Permissions> {
       await delay();
       const u = users.find((x) => x.id === userId);
-      const defaults = groups.filter((g) => g.is_default).map((g) => g.id);
-      // Effective = explicit groups ∪ the default group (the default-basic resolver).
-      const effectiveIds = new Set<number>([...(u?.groupIds ?? []), ...defaults]);
+      const explicit = u?.groupIds ?? [];
+      // Mirror the SQL resolver (infra/db/identity.sql app_resolve_permissions):
+      // the default group is unioned ONLY when the user has no explicit groups
+      // (NOT EXISTS). A user WITH explicit groups does NOT inherit basic.
+      const defaults =
+        explicit.length === 0
+          ? groups.filter((g) => g.is_default).map((g) => g.id)
+          : [];
+      const effectiveIds = new Set<number>([...explicit, ...defaults]);
       const effective = [...effectiveIds]
         .map(groupById)
         .filter((g): g is MockGroup => !!g);

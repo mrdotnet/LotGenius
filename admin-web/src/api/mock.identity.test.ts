@@ -18,7 +18,7 @@ describe("mock identity api", () => {
     expect(users.length).toBeGreaterThan(0);
   });
 
-  it("resolvePermissions unions explicit groups with the default group", async () => {
+  it("resolvePermissions falls back to the default group only when the user has no explicit groups", async () => {
     const api = createMockApi();
     const users = await api.listUsers();
     const def = (await api.listGroups()).find((g) => g.is_default)!;
@@ -29,6 +29,24 @@ describe("mock identity api", () => {
     const perms = await api.resolvePermissions(bare!.id);
     expect(perms.groups).toContain(def.name);
     expect(perms.clearance_tier).toBe(def.clearance_tier);
+  });
+
+  it("does NOT union the default group for a user WITH explicit groups (mirrors the SQL NOT EXISTS)", async () => {
+    const api = createMockApi();
+    const users = await api.listUsers();
+    const def = (await api.listGroups()).find((g) => g.is_default)!;
+
+    // A multi-group user is exactly where the mock previously diverged from the
+    // SQL resolver: app_resolve_permissions unions `basic` ONLY when the user has
+    // no explicit group rows, so an assigned user must NOT inherit it.
+    const assigned = users.find((u) => u.groups.length > 0 && !u.groups.includes(def.name));
+    expect(assigned).toBeDefined();
+    const perms = await api.resolvePermissions(assigned!.id);
+    // The default group is absent...
+    expect(perms.groups).not.toContain(def.name);
+    // ...and the user's explicit groups are exactly what resolves.
+    for (const g of assigned!.groups) expect(perms.groups).toContain(g);
+    expect(perms.groups).toHaveLength(assigned!.groups.length);
   });
 
   it("resolves admin clearance as the max tier across the user's groups", async () => {

@@ -7,13 +7,20 @@
 import type {
   AdminApi,
   DryRunResponse,
+  Group,
+  GroupCreated,
+  GroupPerms,
+  NewGroup,
   OverrideRequest,
   OverrideResponse,
   Pen,
+  Permissions,
   RecomputeResponse,
   ReviewResponse,
   Stranger,
   UndoResponse,
+  UpsertUser,
+  User,
 } from "./types";
 
 // Photos are intentionally null: dummy data has none, so the Card silhouette
@@ -48,6 +55,42 @@ interface Snapshot {
   pens: Pen[];
 }
 
+// ─── Identity seed (mirrors the ABAC schema the admin-shim manages) ──────────
+// A group carries an ordinal clearance tier + two capability flags. The default
+// group is inherited by every user (the "default-basic" resolver).
+interface MockGroup {
+  id: number;
+  name: string;
+  description: string | null;
+  is_default: boolean;
+  clearance_tier: number;
+  can_see_pii: boolean;
+  can_admin: boolean;
+}
+
+interface MockUser {
+  id: string;
+  display_name: string | null;
+  email: string | null;
+  last_seen: string | null;
+  /** Explicitly-assigned group ids (the default group is always added on resolve). */
+  groupIds: number[];
+}
+
+const SEED_GROUPS: MockGroup[] = [
+  { id: 1, name: "basic", description: "Default access for all staff", is_default: true, clearance_tier: 1, can_see_pii: false, can_admin: false },
+  { id: 2, name: "appraisers", description: "Auction appraisers — comps + structured numbers", is_default: false, clearance_tier: 2, can_see_pii: false, can_admin: false },
+  { id: 3, name: "pii-cleared", description: "May view consignor PII (names / phones)", is_default: false, clearance_tier: 3, can_see_pii: true, can_admin: false },
+  { id: 4, name: "admins", description: "Full console administration", is_default: false, clearance_tier: 5, can_see_pii: true, can_admin: true },
+];
+
+const SEED_USERS: MockUser[] = [
+  { id: "a.admin@steffes.com", display_name: "Alex Admin", email: "a.admin@steffes.com", last_seen: "2026-06-18T09:12:00Z", groupIds: [4] },
+  { id: "j.appraiser@steffes.com", display_name: "Jordan Appraiser", email: "j.appraiser@steffes.com", last_seen: "2026-06-18T08:40:00Z", groupIds: [2] },
+  { id: "p.steward@steffes.com", display_name: "Pat Steward", email: "p.steward@steffes.com", last_seen: "2026-06-17T16:05:00Z", groupIds: [2, 3] },
+  { id: "n.newhire@steffes.com", display_name: "Nima Newhire", email: "n.newhire@steffes.com", last_seen: null, groupIds: [] },
+];
+
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
 }
@@ -75,6 +118,39 @@ export function createMockApi(): AdminApi {
   // handle -> prior snapshot, for byte-identical undo.
   const undoLog = new Map<string, Snapshot>();
   let handleSeq = 0;
+
+  // ── Identity state ──
+  const groups: MockGroup[] = clone(SEED_GROUPS);
+  const users: MockUser[] = clone(SEED_USERS);
+  let groupSeq = Math.max(...SEED_GROUPS.map((g) => g.id));
+
+  const groupById = (id: number) => groups.find((g) => g.id === id);
+  const memberCount = (gid: number) =>
+    users.filter((u) => u.groupIds.includes(gid)).length;
+
+  function toGroupDto(g: MockGroup): Group {
+    return { ...g, member_count: memberCount(g.id) };
+  }
+  function toUserDto(u: MockUser): User {
+    return {
+      id: u.id,
+      display_name: u.display_name,
+      email: u.email,
+      last_seen: u.last_seen,
+      groups: u.groupIds
+        .map((id) => groupById(id)?.name)
+        .filter((n): n is string => !!n),
+    };
+  }
+  function findUser(id: string): MockUser {
+    let u = users.find((x) => x.id === id);
+    if (!u) {
+      // Mirror the shim: assigning to an unknown user creates it.
+      u = { id, display_name: null, email: null, last_seen: null, groupIds: [] };
+      users.push(u);
+    }
+    return u;
+  }
 
   function bumpPen(category: string, delta: number) {
     const pen = state.pens.find((p) => p.category === category);
@@ -158,6 +234,108 @@ export function createMockApi(): AdminApi {
       return {
         computed_at: new Date().toISOString(),
         stranger_count: state.strangers.length,
+      };
+    },
+
+    // ── Identity + ABAC group management ──
+    async listGroups(): Promise<Group[]> {
+      await delay();
+      // Highest clearance first, then name — mirrors the shim's ORDER BY.
+      return clone(
+        [...groups]
+          .sort((a, b) => b.clearance_tier - a.clearance_tier || a.name.localeCompare(b.name))
+          .map(toGroupDto),
+      );
+    },
+
+    async createGroup(g: NewGroup): Promise<GroupCreated> {
+      await delay();
+      if (!g.name.trim()) throw new Error("name is required");
+      const id = ++groupSeq;
+      groups.push({
+        id,
+        name: g.name,
+        description: g.description ?? null,
+        is_default: false,
+        clearance_tier: g.clearance_tier ?? 0,
+        can_see_pii: g.can_see_pii ?? false,
+        can_admin: g.can_admin ?? false,
+      });
+      return { id };
+    },
+
+    async updateGroup(id: number, p: GroupPerms): Promise<void> {
+      await delay();
+      const g = groupById(id);
+      if (!g) throw new Error("no such group");
+      g.clearance_tier = p.clearance_tier;
+      g.can_see_pii = p.can_see_pii;
+      g.can_admin = p.can_admin;
+      if (p.description !== undefined && p.description !== null) {
+        g.description = p.description;
+      }
+    },
+
+    async deleteGroup(id: number): Promise<void> {
+      await delay();
+      const g = groupById(id);
+      if (!g) throw new Error("no such group");
+      if (g.is_default) throw new Error("cannot delete the default group");
+      groups.splice(groups.indexOf(g), 1);
+      for (const u of users) u.groupIds = u.groupIds.filter((x) => x !== id);
+    },
+
+    async listUsers(): Promise<User[]> {
+      await delay();
+      return clone([...users].sort((a, b) => a.id.localeCompare(b.id)).map(toUserDto));
+    },
+
+    async upsertUser(u: UpsertUser): Promise<void> {
+      await delay();
+      if (!u.id.trim()) throw new Error("id is required");
+      const existing = users.find((x) => x.id === u.id);
+      if (existing) {
+        existing.display_name = u.display_name ?? null;
+        existing.email = u.email ?? null;
+      } else {
+        users.push({
+          id: u.id,
+          display_name: u.display_name ?? null,
+          email: u.email ?? null,
+          last_seen: null,
+          groupIds: [],
+        });
+      }
+    },
+
+    async assignGroup(userId: string, groupId: number): Promise<void> {
+      await delay();
+      const u = findUser(userId);
+      if (!u.groupIds.includes(groupId)) u.groupIds.push(groupId);
+    },
+
+    async removeGroup(userId: string, groupId: number): Promise<void> {
+      await delay();
+      const u = users.find((x) => x.id === userId);
+      if (u) u.groupIds = u.groupIds.filter((x) => x !== groupId);
+    },
+
+    async resolvePermissions(userId: string): Promise<Permissions> {
+      await delay();
+      const u = users.find((x) => x.id === userId);
+      const defaults = groups.filter((g) => g.is_default).map((g) => g.id);
+      // Effective = explicit groups ∪ the default group (the default-basic resolver).
+      const effectiveIds = new Set<number>([...(u?.groupIds ?? []), ...defaults]);
+      const effective = [...effectiveIds]
+        .map(groupById)
+        .filter((g): g is MockGroup => !!g);
+      return {
+        clearance_tier: effective.reduce((m, g) => Math.max(m, g.clearance_tier), 0),
+        can_see_pii: effective.some((g) => g.can_see_pii),
+        can_admin: effective.some((g) => g.can_admin),
+        groups: effective
+          .sort((a, b) => b.clearance_tier - a.clearance_tier || a.name.localeCompare(b.name))
+          .map((g) => g.name),
       };
     },
   };

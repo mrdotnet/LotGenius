@@ -66,6 +66,25 @@ export function makeFakeApi(initial: Stranger[]): {
     async recompute() {
       return { computed_at: new Date().toISOString(), stranger_count: strangers.length };
     },
+    // Identity methods are unused by the review-lane hero flow; safe no-op stubs
+    // keep this fake conformant with the extended AdminApi surface.
+    async listGroups() {
+      return [];
+    },
+    async createGroup() {
+      return { id: 0 };
+    },
+    async updateGroup() {},
+    async deleteGroup() {},
+    async listUsers() {
+      return [];
+    },
+    async upsertUser() {},
+    async assignGroup() {},
+    async removeGroup() {},
+    async resolvePermissions() {
+      return { clearance_tier: 0, can_see_pii: false, can_admin: false, groups: [] };
+    },
   };
 
   return { api, calls };

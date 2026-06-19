@@ -28,7 +28,23 @@ INDEX_HTML = r"""<!DOCTYPE html>
   header .mark .lg{color:var(--accent)}
   header .tag{font-size:11px;color:var(--muted);border:1px solid var(--line);
     border-radius:999px;padding:2px 9px;text-transform:uppercase;letter-spacing:.6px}
-  header .sub{font-size:12px;color:var(--muted);margin-left:auto}
+  header .who{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  header .who label{text-transform:uppercase;letter-spacing:.6px;font-size:11px}
+  #role{background:var(--panel-2);color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:6px 9px;font-size:13px;outline:none;cursor:pointer}
+  #role:focus{border-color:var(--accent)}
+  .pii{font-size:11px;border-radius:999px;padding:2px 9px;border:1px solid var(--line);
+    text-transform:uppercase;letter-spacing:.5px}
+  .pii.on{background:var(--chip);color:var(--chip-ink);border-color:#295c40}
+  .pii.off{background:var(--amber);color:var(--amber-ink);border-color:var(--amber-line)}
+  .consignor{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--panel-2);
+    border:1px solid var(--line);font-size:13px}
+  .consignor .ctitle{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);
+    margin-bottom:6px}
+  .consignor .row{display:flex;gap:8px}
+  .consignor .k{color:var(--muted);min-width:64px}
+  .consignor .v{font-variant-numeric:tabular-nums}
+  .consignor .v.redacted{color:var(--amber-ink);font-style:italic}
   main{max-width:820px;margin:0 auto;padding:22px 18px 140px}
   .examples{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
   .examples button{background:var(--panel-2);color:var(--muted);border:1px solid var(--line);
@@ -69,7 +85,11 @@ INDEX_HTML = r"""<!DOCTYPE html>
 <header>
   <span class="mark"><span class="lg">Lot</span> Genius</span>
   <span class="tag">local demo · Teams stand-in</span>
-  <span class="sub">vector finds the lots · SQL supplies the numbers</span>
+  <span class="who">
+    <label for="role">Signed in as</label>
+    <select id="role" title="Switch the demo caller to see the consignor-PII differential"></select>
+    <span id="pii" class="pii off">PII hidden</span>
+  </span>
 </header>
 <main>
   <div class="examples">
@@ -91,12 +111,61 @@ INDEX_HTML = r"""<!DOCTYPE html>
   var input = document.getElementById('q');
   var sendBtn = document.getElementById('send');
   var transcript = document.getElementById('transcript');
+  var roleSel = document.getElementById('role');
+  var piiBadge = document.getElementById('pii');
+
+  // Map of role -> can_see_pii, populated from /roles so the selector mirrors
+  // the seeded ABAC groups (basic/appraiser/admin) rather than a hardcoded list.
+  var roleCanSeePii = {};
 
   function el(tag, cls, text){
     var e = document.createElement(tag);
     if(cls) e.className = cls;
     if(text != null) e.textContent = text;
     return e;
+  }
+
+  function updatePiiBadge(){
+    var canSee = !!roleCanSeePii[roleSel.value];
+    piiBadge.textContent = canSee ? 'PII visible' : 'PII hidden';
+    piiBadge.className = 'pii ' + (canSee ? 'on' : 'off');
+  }
+
+  async function loadRoles(){
+    try{
+      var res = await fetch('/roles');
+      var data = await res.json();
+      (data.roles || []).forEach(function(r){
+        roleCanSeePii[r.role] = r.can_see_pii;
+        var opt = el('option', null, r.label);
+        opt.value = r.role;
+        roleSel.appendChild(opt);
+      });
+      if(data.default) roleSel.value = data.default;
+    }catch(e){ /* selector stays empty; /ask still defaults to basic */ }
+    updatePiiBadge();
+  }
+  roleSel.addEventListener('change', updatePiiBadge);
+
+  function renderConsignor(node, consignor){
+    if(!consignor) return;
+    var box = el('div','consignor');
+    box.appendChild(el('div','ctitle','Consignor (restricted)'));
+    var FIELDS = [
+      ['consignor_name','Name'],
+      ['consignor_phone','Phone'],
+      ['consignor_email','Email']
+    ];
+    FIELDS.forEach(function(f){
+      var val = consignor[f[0]];
+      if(val == null) return;
+      var row = el('div','row');
+      row.appendChild(el('span','k', f[1]));
+      var redacted = (val === '[REDACTED]');
+      row.appendChild(el('span','v' + (redacted ? ' redacted' : ''), val));
+      box.appendChild(row);
+    });
+    node.appendChild(box);
   }
 
   function addQuestion(text){
@@ -134,8 +203,13 @@ INDEX_HTML = r"""<!DOCTYPE html>
       node.appendChild(chips);
     }
 
+    if(!data.escalated) renderConsignor(node, data.consignor);
+
     var meta = el('div','meta');
     meta.appendChild(el('span','intent', 'route: ' + (data.intent||'—')));
+    if(data.caller_label){
+      meta.appendChild(el('span', null, 'as: ' + data.caller_label));
+    }
     meta.appendChild(el('span', null, (data.latency_ms != null ? data.latency_ms + ' ms' : '')));
     node.appendChild(meta);
     window.scrollTo(0, document.body.scrollHeight);
@@ -157,7 +231,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
       var res = await fetch('/ask', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({query: text.trim()})
+        body: JSON.stringify({query: text.trim(), role: roleSel.value || null})
       });
       var data = await res.json();
       if(!res.ok){ renderError(answerNode, data.error || ('HTTP ' + res.status)); }
@@ -175,6 +249,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
   Array.prototype.forEach.call(document.querySelectorAll('.examples button'), function(b){
     b.addEventListener('click', function(){ ask(b.getAttribute('data-q')); });
   });
+  loadRoles();
   input.focus();
 })();
 </script>

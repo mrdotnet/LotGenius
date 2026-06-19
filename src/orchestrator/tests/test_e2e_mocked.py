@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 
-from lotgenius_orchestrator import MockMCPClient, Orchestrator
+from lotgenius_orchestrator import MockMCPClient, Orchestrator, demo_caller
 from lotgenius_orchestrator.orchestrator import REFUSAL_TEXT
 from lotgenius_orchestrator.router import Intent
 
@@ -108,9 +108,9 @@ def test_analyze_is_always_called_after_retrieval(monkeypatch) -> None:
     calls: list[str] = []
     original = client.call_tool
 
-    def _spy(name: str, arguments: dict):  # type: ignore[no-untyped-def]
+    def _spy(name: str, arguments: dict, *, caller=None):  # type: ignore[no-untyped-def]
         calls.append(name)
-        return original(name, arguments)
+        return original(name, arguments, caller=caller)
 
     monkeypatch.setattr(client, "call_tool", _spy)
     Orchestrator(client).answer("Show me comps for an X9 1100", scenario="money_shot")
@@ -147,6 +147,51 @@ def test_format_answer_suppresses_footer_for_structured_aggregate() -> None:
     assert "unverified" not in text
     assert "Sources:" not in text  # no lot_ids to cite; aggregate provenance
     assert text == agg  # answer passed through untouched
+
+
+def test_pii_differential_admin_sees_consignor_basic_redacted() -> None:
+    """Item 4 headline: the SAME query, two callers, different PII visibility.
+
+    The consignor block is released in cleartext only to a caller the seam
+    resolves to can_see_pii (admin). basic/appraiser/anonymous get [REDACTED].
+    This is the end-to-end proof that the caller threaded through the orchestrator
+    drives the seam's field-level gate.
+    """
+    query = "Show me 5 comps for a 2023 John Deere X9 1100"
+
+    admin = _orch().answer(query, scenario="money_shot", caller=demo_caller("admin").identity)
+    assert admin.consignor is not None
+    assert admin.consignor["consignor_name"] == "Dale Branton"
+    assert admin.consignor["consignor_phone"] == "701-555-0142"
+
+    basic = _orch().answer(query, scenario="money_shot", caller=demo_caller("basic").identity)
+    assert basic.consignor is not None
+    assert basic.consignor["consignor_name"] == "[REDACTED]"
+    assert basic.consignor["consignor_phone"] == "[REDACTED]"
+
+    appraiser = _orch().answer(
+        query, scenario="money_shot", caller=demo_caller("appraiser").identity
+    )
+    assert appraiser.consignor is not None
+    assert appraiser.consignor["consignor_name"] == "[REDACTED]"
+
+    # Anonymous (no caller) falls back to the default basic group -> redacted.
+    anon = _orch().answer(query, scenario="money_shot")
+    assert anon.consignor is not None
+    assert anon.consignor["consignor_name"] == "[REDACTED]"
+
+
+def test_pii_differential_does_not_change_the_priced_answer() -> None:
+    """Redaction is field-level: it gates consignor PII, not the comps/numbers.
+
+    A basic caller still gets the full priced answer + Lot-ID citations — only the
+    consignor identity is withheld. (The trusted numbers are not PII.)
+    """
+    query = "Show me 5 comps for a 2023 John Deere X9 1100"
+    admin = _orch().answer(query, scenario="money_shot", caller=demo_caller("admin").identity)
+    basic = _orch().answer(query, scenario="money_shot", caller=demo_caller("basic").identity)
+    assert admin.text == basic.text
+    assert admin.citations == basic.citations == [4412, 4380, 4501, 4290, 4188]
 
 
 def test_format_answer_appends_sources_when_citations_present() -> None:

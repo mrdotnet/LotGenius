@@ -6,6 +6,7 @@
 //! deterministic alias/override table. It does **NOT** depend on the Background-IP runtime —
 //! no `analyze`/`classify_only`, no embedding of new lots (PRD §9).
 
+pub mod abac;
 pub mod api;
 pub mod config;
 pub mod db;
@@ -53,6 +54,27 @@ pub fn router(state: AppState) -> Router {
             delete(identity::remove_group),
         )
         .route("/admin/users/{id}/permissions", get(identity::resolve))
+        // ---- P4 ABAC field-class model (field classes · group×class matrix · column tags) ----
+        .route(
+            "/admin/field-classes",
+            get(abac::list_field_classes).post(abac::create_field_class),
+        )
+        .route(
+            "/admin/field-grants",
+            get(abac::list_field_grants).post(abac::grant_field_class),
+        )
+        .route(
+            "/admin/field-grants/{group}/{class}",
+            delete(abac::revoke_field_class),
+        )
+        .route(
+            "/admin/column-tags",
+            get(abac::list_column_tags).post(abac::tag_column),
+        )
+        .route(
+            "/admin/column-tags/{table}/{column}",
+            delete(abac::untag_column),
+        )
         .route("/health", get(|| async { "ok" }))
         .layer(cors)
         .with_state(state)
